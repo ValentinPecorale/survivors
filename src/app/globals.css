@@ -24,7 +24,7 @@ body {
   position: absolute;
   z-index: 10;
   right: 20px;
-  top: 20px;
+  top: 76px;
   color: var(--panel-text);
   background: #101011f5;
   border: 1px solid #353536;
@@ -34,7 +34,7 @@ body {
 }
 .properties-panel {
   width: 268px;
-  max-height: calc(100svh - 40px);
+  max-height: calc(100svh - 96px);
   display: flex;
   flex-direction: column;
   border-radius: 19px;
@@ -104,7 +104,7 @@ body {
 .properties-panel :is(button,input,select,summary):focus-visible, .properties-launcher:focus-visible { outline: 2px solid #bfc8d0; outline-offset: 3px; }
 @keyframes properties-enter { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
 @media (max-width: 600px) {
-  .properties-panel, .properties-launcher { top: 12px; right: 12px; }
+  .properties-panel, .properties-launcher { top: 68px; right: 12px; }
   .properties-panel { width: min(268px, calc(100vw - 24px)); max-height: min(70svh, 640px); }
 }
 @media (prefers-reduced-motion: reduce) {
@@ -115,3 +115,29 @@ body {
 .properties-preset button { flex-shrink: 0; background: #29292b; border: 1px solid #ffffff0e; border-radius: 7px; padding: 7px 10px; color: #dededc; font-size: 10px; cursor: pointer; }
 .properties-preset button:hover { background: #353537; }
 .properties-preset [role="status"] { color: #999996; font-size: 9px; }
+
+/* Site navigation — sits above the hero and the properties panel (z 10). */
+.site-nav {
+  position: fixed;
+  inset: 0 0 auto 0;
+  z-index: 20;
+  height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 24px;
+  color: var(--foreground);
+  font-family: var(--font-geist-sans), sans-serif;
+  animation: site-nav-enter 700ms cubic-bezier(0.22, 1, 0.36, 1) 150ms both;
+}
+.site-nav-brand { font-size: 15px; font-weight: 650; letter-spacing: -0.02em; }
+.site-nav ul { display: flex; gap: 28px; list-style: none; margin: 0; padding: 0; }
+.site-nav ul a { font-size: 13px; letter-spacing: 0.01em; opacity: 0.62; transition: opacity 200ms ease-out; }
+.site-nav ul a:hover, .site-nav ul a:focus-visible { opacity: 1; }
+.site-nav a:focus-visible { outline: 2px solid #bfc8d0; outline-offset: 4px; border-radius: 4px; }
+@keyframes site-nav-enter { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: none; } }
+@media (max-width: 640px) {
+  .site-nav { padding: 0 16px; }
+  .site-nav ul { gap: 18px; }
+}
+@media (prefers-reduced-motion: reduce) { .site-nav { animation: none; } }
