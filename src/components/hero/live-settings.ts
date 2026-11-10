@@ -8,11 +8,11 @@ export const defaultAscii = {
 }
 
 export const defaultCamera = {
-  landingMotion: true, landingStrength: 1,
-  focalLength: 85.56, orbit: 0, elevation: 0, shiftX: 0, shiftY: 0,
+  landingMotion: true, landingStrength: 4,
+  focalLength: 56, orbit: 0, elevation: 0, shiftX: 0, shiftY: 0,
   exposure: 0, toneMapping: "none",
-  cursorEnabled: true, cursorHorizontal: 3, cursorVertical: 2,
-  cursorSmoothing: 0.35, cursorReverse: false,
+  cursorEnabled: true, cursorHorizontal: 15, cursorVertical: 3.6,
+  cursorSmoothing: 1.5, cursorReverse: true,
 }
 
 export const defaultModel = {

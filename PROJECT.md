@@ -28,7 +28,7 @@ The properties panel is the current tool for tuning the hero. Its eventual visib
 - The tiger uses one fixed framing envelope measured across 65 poses of the full run, with 6% padding (`tiger-framing.json`). The camera target and fit never follow animated limb/tail bounds. This avoids camera bobbing and lens-shift turbulence; individual poses move naturally inside the centered shot. Cursor orbit and explicit subject edits still update the framing. The intentional authored footstep dip is layered on afterward and is never cancelled by auto-centering. Portrait screens fit the complete envelope within 84% of the viewport. Regenerate this metadata when replacing the tiger model or animation.
 - The resting camera is level with the tiger center and perpendicular to its path for a pure side profile. The existing lens, orbit distance and framing shifts are retained; manual orbit/elevation offsets of 0 give the square-on view.
 - Cursor movement orbits the camera around the tiger horizontally and vertically. The camera keeps looking at the tiger, at a constant orbit distance for a fixed target. Cursor motion does not rotate the models.
-- Orbit defaults: ±3° horizontal, ±2° vertical, 0.35s smoothing. The orbit center follows the tiger's position and scale. Touch and reduced-motion preferences disable cursor camera movement.
+- Orbit defaults: ±15° horizontal, ±3.6° vertical, 1.5 smoothing, reversed; landing strength 4×; focal length 56mm. The orbit center follows the tiger's position and scale. Touch and reduced-motion preferences disable cursor camera movement.
 - ASCII white point is 0.20 at rest and 0.12 around the cursor. Hover defaults: 120px radius, soft edge, 180ms easing. The tiger is unaffected. Touch devices keep the resting ASCII effect.
 - Live panel tabs: ASCII, 3D Model and Camera. Controls include rendering, materials, lighting, transforms, animation and camera settings.
 
@@ -57,7 +57,7 @@ The user also shared a Blender handoff screenshot describing updated, level side
 
 Code defaults live in `src/components/hero/live-settings.ts`.
 
-**Save as default** stores the complete configuration in this browser's localStorage, under `survivors:default-settings:v1`. It restores on reopening, but does not update source defaults or publish a configuration to other browsers. A production-wide preset should be captured explicitly into source when requested.
+**Save as default** stores the complete configuration in this browser's localStorage, under `survivors:default-settings:v2`. It restores on reopening, but does not update source defaults or publish a configuration to other browsers. A production-wide preset should be captured explicitly into source when requested.
 
 The repository is linked to Vercel project `survivors`, owned by `pecoralev-8218's projects`. Production releases ship from the GitHub `main` branch to https://survivors-ten.vercel.app.
 
