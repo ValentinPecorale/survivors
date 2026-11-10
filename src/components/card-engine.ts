@@ -16,7 +16,7 @@ type Motion = {
   p: number
   target: number | null
   scrubbed: boolean
-  /** Key held down: p follows time, linearly, until released or HOLD_MS elapses. */
+  /** Key held down: p follows time through holdEase until released or HOLD_MS elapses. */
   hold: { start: number; replace: number | null } | null
   tween: { from: number; to: number; start: number; delay: number; dur: number; onDone: () => void } | null
 }
@@ -28,7 +28,7 @@ const SMOOTH_MS = 90
 const MIN_TWEEN = 0.35
 /** Hold a section key this long to fully open its card. */
 export const HOLD_MS = 2000
-/** Releasing past this progress (1s of a 2s hold) completes the card; before it, the card retreats. */
+/** Releasing past this fraction of the hold (1s of 2s) completes the card; before it, the card retreats. */
 export const HOLD_COMMIT = 0.5
 
 /** cubic-bezier(x1, y1, x2, y2) solver, same curve CSS uses. */
@@ -61,6 +61,8 @@ function cubicBezier(x1: number, y1: number, x2: number, y2: number) {
   }
 }
 const ease = cubicBezier(0.76, 0, 0.24, 1)
+/** Hold-to-open curve over the 2s hold: softer than the button slide so the card eases in, then eases out. Symmetric, so 1s of holding is exactly 50%. */
+const holdEase = cubicBezier(0.65, 0, 0.35, 1)
 const clamp01 = (v: number) => Math.min(1, Math.max(0, v))
 
 export function createCardEngine<Id extends string>(order: readonly Id[], onChange: (cards: Card<Id>[]) => void) {
@@ -97,8 +99,9 @@ export function createCardEngine<Id extends string>(order: readonly Id[], onChan
     for (const [key, m] of [...motion]) {
       const t = m.tween
       if (m.hold) {
-        m.p = clamp01((now - m.hold.start) / HOLD_MS)
-        if (m.p >= 1) { paint(key); finishHold(key); continue }
+        const raw = clamp01((now - m.hold.start) / HOLD_MS)
+        m.p = holdEase(raw)
+        if (raw >= 1) { paint(key); finishHold(key); continue }
         active = true
       } else if (t) {
         const u = (now - t.start - t.delay) / t.dur
@@ -206,9 +209,11 @@ export function createCardEngine<Id extends string>(order: readonly Id[], onChan
       const held = [...motion].find(([, m]) => m.hold)
       if (!held) return
       const [key, m] = held
-      m.p = clamp01((performance.now() - m.hold!.start) / HOLD_MS)
+      // Commit on time held (1s of 2s), not on eased position.
+      const raw = clamp01((performance.now() - m.hold!.start) / HOLD_MS)
+      m.p = holdEase(raw)
       paint(key)
-      if (m.p >= HOLD_COMMIT) {
+      if (raw >= HOLD_COMMIT) {
         const replace = m.hold!.replace
         m.hold = null
         tweenTo(key, 1, { onDone: () => { m.hold = { start: 0, replace }; finishHold(key) } })

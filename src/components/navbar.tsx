@@ -25,7 +25,8 @@ const SCROLL_TRAVEL = 0.8
  *   the front card out; its position follows the gesture linearly, so you
  *   scroll normally until the card is fully visible. See card-engine.ts.
  * - Hold a section's letter ([W] [S] [C]) for 2s: its card slides in linearly with
- *   the hold. Release before 1s and it returns; after 1s it finishes opening.
+ *   the hold (ease in-out, cubic-bezier(0.65, 0, 0.35, 1) over 2s). Release before 1s
+ *   and it returns; after 1s it finishes opening.
  * - Close, Esc or the wordmark clears the whole stack, top card first (70ms stagger).
  *
  * A small rAF engine instead of ScrollTrigger: the page has no document scroll
