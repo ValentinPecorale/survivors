@@ -6,9 +6,9 @@ import { createCardEngine, type Card } from "./card-engine"
 
 /** Each section owns one card. */
 const sections = [
-  { id: "work", label: "Work", title: "Selected work", body: "Placeholder copy. Projects, case studies and client names will live here once the portfolio is designed." },
-  { id: "studio", label: "Studio", title: "The studio", body: "Placeholder copy. Who we are, how we work and what we believe in." },
-  { id: "contact", label: "Contact", title: "Let's talk", body: "Placeholder copy. Email, socials and a short brief form will live here." },
+  { id: "work", label: "Work", key: "w", title: "Selected work", body: "Placeholder copy. Projects, case studies and client names will live here once the portfolio is designed." },
+  { id: "studio", label: "Studio", key: "s", title: "The studio", body: "Placeholder copy. Who we are, how we work and what we believe in." },
+  { id: "contact", label: "Contact", key: "c", title: "Let's talk", body: "Placeholder copy. Email, socials and a short brief form will live here." },
 ] as const
 
 type SectionId = (typeof sections)[number]["id"]
@@ -24,6 +24,8 @@ const SCROLL_TRAVEL = 0.8
  * - Scroll / swipe: scrubbed. Down pulls the next section's card in, up pushes
  *   the front card out; its position follows the gesture linearly, so you
  *   scroll normally until the card is fully visible. See card-engine.ts.
+ * - Hold a section's letter ([W] [S] [C]) for 2s: its card slides in linearly with
+ *   the hold. Release before 1s and it returns; after 1s it finishes opening.
  * - Close, Esc or the wordmark clears the whole stack, top card first (70ms stagger).
  *
  * A small rAF engine instead of ScrollTrigger: the page has no document scroll
@@ -52,6 +54,32 @@ export function Navbar() {
     window.addEventListener("keydown", onKey)
     return () => window.removeEventListener("keydown", onKey)
   }, [hasCards, engine])
+
+  // Hold a section's letter for 2s to open its card; see card-engine.ts holdStart/holdEnd.
+  useEffect(() => {
+    const editable = (target: EventTarget | null) => target instanceof HTMLElement && (target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName))
+    let holding: string | null = null
+    const reduced = () => window.matchMedia("(prefers-reduced-motion: reduce)").matches
+    const down = (event: KeyboardEvent) => {
+      if (event.repeat || holding || event.ctrlKey || event.metaKey || event.altKey || editable(event.target)) return
+      const section = sections.find(s => s.key === event.key.toLowerCase())
+      if (!section) return
+      if (reduced()) { engine.open(section.id); return }
+      if (engine.holdStart(section.id)) holding = section.key
+    }
+    const up = (event: KeyboardEvent) => {
+      if (holding && event.key.toLowerCase() === holding) { holding = null; engine.holdEnd() }
+    }
+    const blur = () => { if (holding) { holding = null; engine.holdEnd() } }
+    window.addEventListener("keydown", down)
+    window.addEventListener("keyup", up)
+    window.addEventListener("blur", blur)
+    return () => {
+      window.removeEventListener("keydown", down)
+      window.removeEventListener("keyup", up)
+      window.removeEventListener("blur", blur)
+    }
+  }, [engine])
 
   useEffect(() => {
     const touch = { y: null as number | null }
@@ -99,7 +127,7 @@ export function Navbar() {
           <ul>
             {sections.map(s => (
               <li key={s.id}>
-                <button type="button" data-active={top?.id === s.id ? "true" : undefined} aria-disabled={locked || undefined} onClick={() => { if (!locked) engine.open(s.id) }}>{s.label}</button>
+                <button type="button" data-active={top?.id === s.id ? "true" : undefined} aria-disabled={locked || undefined} onClick={() => { if (!locked) engine.open(s.id) }}>{s.label}<kbd aria-hidden="true">[{s.key.toUpperCase()}]</kbd></button>
               </li>
             ))}
           </ul>

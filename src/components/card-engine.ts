@@ -16,6 +16,8 @@ type Motion = {
   p: number
   target: number | null
   scrubbed: boolean
+  /** Key held down: p follows time, linearly, until released or HOLD_MS elapses. */
+  hold: { start: number; replace: number | null } | null
   tween: { from: number; to: number; start: number; delay: number; dur: number; onDone: () => void } | null
 }
 
@@ -24,6 +26,10 @@ export const STAGGER_MS = 70
 /** Follow time constant for scrubbing: ~90ms glides wheel notches without adding easing. */
 const SMOOTH_MS = 90
 const MIN_TWEEN = 0.35
+/** Hold a section key this long to fully open its card. */
+export const HOLD_MS = 2000
+/** Releasing past this progress (1s of a 2s hold) completes the card; before it, the card retreats. */
+export const HOLD_COMMIT = 0.5
 
 /** cubic-bezier(x1, y1, x2, y2) solver, same curve CSS uses. */
 function cubicBezier(x1: number, y1: number, x2: number, y2: number) {
@@ -69,7 +75,7 @@ export function createCardEngine<Id extends string>(order: readonly Id[], onChan
   const commit = (next: Card<Id>[]) => { cards = next; onChange(next) }
   const live = () => cards.filter(c => !c.closing)
   const front = () => live().at(-1)
-  const busy = () => [...motion.values()].some(m => m.tween)
+  const busy = () => [...motion.values()].some(m => m.tween || m.hold)
 
   const paint = (key: number) => {
     const el = els.get(key)
@@ -90,7 +96,11 @@ export function createCardEngine<Id extends string>(order: readonly Id[], onChan
     let active = false
     for (const [key, m] of [...motion]) {
       const t = m.tween
-      if (t) {
+      if (m.hold) {
+        m.p = clamp01((now - m.hold.start) / HOLD_MS)
+        if (m.p >= 1) { paint(key); finishHold(key); continue }
+        active = true
+      } else if (t) {
         const u = (now - t.start - t.delay) / t.dur
         if (u < 0) { active = true; continue }
         if (u >= 1) { m.p = t.to; m.tween = null; paint(key); t.onDone(); continue }
@@ -121,7 +131,17 @@ export function createCardEngine<Id extends string>(order: readonly Id[], onChan
     const m = motion.get(key)
     if (!m) return
     m.target = null
+    m.hold = null
     m.tween = { from: m.p, to, start: performance.now(), delay: opts.delay ?? 0, dur: SLIDE_MS * Math.max(MIN_TWEEN, Math.abs(to - m.p)), onDone: opts.onDone }
+  }
+
+  /** A held card is now fully open: drop the older card of the same section it was lifted from. */
+  const finishHold = (key: number) => {
+    const m = motion.get(key)
+    const replace = m?.hold?.replace ?? null
+    if (m) { m.hold = null; m.p = 1 }
+    if (replace !== null) motion.delete(replace)
+    commit(cards.filter(c => c.key !== replace).map(c => (c.key === key ? { ...c, entering: false } : c)))
   }
 
   /** Appends a card for `id` at p = 0, dropping any older live card of the same section. */
@@ -129,7 +149,7 @@ export function createCardEngine<Id extends string>(order: readonly Id[], onChan
     const key = nextKey++
     const previous = cards.find(c => !c.closing && c.id === id)
     if (previous) motion.delete(previous.key)
-    motion.set(key, { p: 0, target: null, scrubbed: false, tween: null })
+    motion.set(key, { p: 0, target: null, scrubbed: false, hold: null, tween: null })
     return { key, next: [...cards.filter(c => c.closing || c.id !== id), { key, id, closing: false, entering: false } as Card<Id>] }
   }
 
@@ -162,6 +182,39 @@ export function createCardEngine<Id extends string>(order: readonly Id[], onChan
       if (reduced()) { motion.get(key)!.p = 1; commit(next); return }
       commit(next.map(c => (c.key === key ? { ...c, entering: true } : c)))
       tweenTo(key, 1, { onDone: () => settle(key) })
+      kick()
+    },
+
+    /**
+     * Key pressed: the section's card starts sliding in, linear in time over
+     * HOLD_MS. If the section already has a card lower in the stack it stays
+     * put until this one commits, so an aborted hold loses nothing.
+     */
+    holdStart(id: Id) {
+      if (busy() || cards.some(c => c.closing)) return false
+      if (front()?.id === id) return false
+      const key = nextKey++
+      const replace = live().find(c => c.id === id)?.key ?? null
+      motion.set(key, { p: 0, target: null, scrubbed: false, hold: { start: performance.now(), replace }, tween: null })
+      commit([...cards, { key, id, closing: false, entering: true } as Card<Id>])
+      kick()
+      return true
+    },
+
+    /** Key released: past HOLD_COMMIT the card finishes opening, before it the card returns to where it started. */
+    holdEnd() {
+      const held = [...motion].find(([, m]) => m.hold)
+      if (!held) return
+      const [key, m] = held
+      m.p = clamp01((performance.now() - m.hold!.start) / HOLD_MS)
+      paint(key)
+      if (m.p >= HOLD_COMMIT) {
+        const replace = m.hold!.replace
+        m.hold = null
+        tweenTo(key, 1, { onDone: () => { m.hold = { start: 0, replace }; finishHold(key) } })
+      } else {
+        tweenTo(key, 0, { onDone: () => remove(key) })
+      }
       kick()
     },
 
