@@ -1,15 +1,22 @@
+/* Three.js cameras, uniforms and renderer settings are mutable objects owned by the render loop. */
+/* eslint-disable react-hooks/immutability */
 "use client"
 
-import { useShaderLab } from "@basementstudio/shader-lab"
+import { useShaderLabPostProcessingSource } from "@basementstudio/shader-lab"
 import { useAnimations, useGLTF } from "@react-three/drei"
 import { Canvas, createPortal, useFrame, useThree } from "@react-three/fiber"
 import { useEffect, useLayoutEffect, useMemo, useRef } from "react"
 import * as THREE from "three"
-import { float, texture as tslTexture, uv, vec2 } from "three/tsl"
+import { float, texture as tslTexture, uv, vec2, uniform, mix, neutralToneMapping } from "three/tsl"
 import { MeshBasicNodeMaterial, WebGPURenderer } from "three/webgpu"
+import type { AsciiSettings, ModelSettings } from "./live-settings"
+import landingKeys from "./camera-landing.json"
+import { projectedBounds, type TigerFrame } from "./camera-framing"
+import { useAsciiHover } from "./ascii-hover"
+import { Tiger } from "./tiger"
 import { asciiConfig, columnsFor } from "./ascii-config"
 
-const MODEL_URL = "/models/plants.glb"
+const MODEL_URL = "/models/plants.glb?v=landing-20261110"
 useGLTF.preload(MODEL_URL)
 
 /** Aspect the shot was framed for in Blender (camera.aspectRatio in the GLB). */
@@ -18,66 +25,221 @@ const AUTHORED_ASPECT = 16 / 9
 /**
  * Plays the GLB exactly as framed in Blender, through the GLB's own camera.
  */
-function Plants() {
+function Plants({ settings, orbitTarget, subjectFrame }: { settings: ModelSettings; orbitTarget: THREE.Vector3; subjectFrame: TigerFrame }) {
   const { scene, animations, cameras } = useGLTF(MODEL_URL)
-  const { actions } = useAnimations(animations, scene)
+  const { actions, mixer } = useAnimations(animations, scene)
   const set = useThree((s) => s.set)
   const size = useThree((s) => s.size)
+  const canvas = useThree((s) => s.gl.domElement)
+  const cursor = useRef({ targetX: 0, targetY: 0, x: 0, y: 0, allowed: false, reduced: false })
+  const cameraOrbit = useMemo(() => ({ offset: new THREE.Vector3(), sphere: new THREE.Spherical(), radius: 0, sample: new THREE.Vector3() }), [])
+  const landingLoops = useRef(0)
+  const landing = useMemo(() => new THREE.LinearInterpolant(
+    new Float32Array(landingKeys.times), new Float32Array(landingKeys.offsetY), 1), [])
+  const root = useRef<THREE.Group>(null)
+  const spin = useRef(0)
+  const authored = useMemo(() => {
+    scene.updateMatrixWorld(true)
+    const source = cameras[0] as THREE.PerspectiveCamera
+    const camera = source.clone()
+    source.matrixWorld.decompose(camera.position, camera.quaternion, camera.scale)
+    camera.scale.set(1, 1, 1)
+    return { camera, position: new THREE.Vector3().fromArray(landingKeys.restPosition), fov: camera.fov }
+  }, [scene, cameras])
 
-  const authored = cameras[0] as THREE.PerspectiveCamera
-  const authoredYFov = useMemo(() => authored.fov, [authored])
-
-  // Blender exports the camera object's scale (here 0.69 / 7.77 / 4.12).
-  // Blender ignores it when rendering, three.js does not: it would stretch
-  // the whole view. Reset it so we see exactly what Blender's camera sees.
+  useLayoutEffect(() => { set({ camera: authored.camera }) }, [authored, set])
   useLayoutEffect(() => {
-    authored.scale.set(1, 1, 1)
-    authored.updateMatrixWorld(true)
-    set({ camera: authored })
-  }, [authored, set])
-
-  // "Cover" framing: never show past the edges of the authored 16:9 frame.
-  // Wider than 16:9 → keep horizontal FOV, crop top/bottom.
-  // Narrower (portrait) → keep vertical FOV, crop the sides.
-  useLayoutEffect(() => {
+    const { camera, fov } = authored
     const aspect = size.width / size.height
-    authored.aspect = aspect
-    if (aspect > AUTHORED_ASPECT) {
-      const hHalf = Math.atan(Math.tan(THREE.MathUtils.degToRad(authoredYFov) / 2) * AUTHORED_ASPECT)
-      authored.fov = THREE.MathUtils.radToDeg(2 * Math.atan(Math.tan(hHalf) / aspect))
-    } else {
-      authored.fov = authoredYFov
-    }
-    authored.updateProjectionMatrix()
-  }, [authored, authoredYFov, size.width, size.height])
+    const baseHalf = Math.atan(Math.tan(THREE.MathUtils.degToRad(fov) / 2) * 85.56 / settings.focalLength)
+    camera.aspect = aspect
+    camera.fov = THREE.MathUtils.radToDeg(2 * (aspect > AUTHORED_ASPECT
+      ? Math.atan(Math.tan(baseHalf) * AUTHORED_ASPECT / aspect) : baseHalf))
+    camera.setViewOffset(size.width, size.height, settings.shiftX * size.width / 2,
+      -settings.shiftY * size.height / 2, size.width, size.height)
+    camera.updateProjectionMatrix()
+    camera.updateMatrixWorld(true)
+  }, [authored, size, settings.focalLength, settings.shiftX, settings.shiftY])
 
   useEffect(() => {
-    const loop = actions.Loop ?? Object.values(actions)[0]
-    loop?.reset().setLoop(THREE.LoopRepeat, Infinity).play()
-    return () => {
-      loop?.stop()
+    const motion = window.matchMedia("(prefers-reduced-motion: reduce)")
+    const pointer = window.matchMedia("(hover: hover) and (pointer: fine)")
+    const state = cursor.current
+    const center = () => { state.targetX = 0; state.targetY = 0 }
+    const updatePreference = () => {
+      state.reduced = motion.matches
+      state.allowed = settings.cursorEnabled && !motion.matches && pointer.matches
+      center()
     }
-  }, [actions])
+    const move = (event: PointerEvent) => {
+      if (!state.allowed || event.pointerType === "touch") return
+      const bounds = canvas.getBoundingClientRect()
+      if (!bounds.width || !bounds.height) return
+      state.targetX = THREE.MathUtils.clamp((event.clientX - bounds.left) / bounds.width * 2 - 1, -1, 1)
+      state.targetY = THREE.MathUtils.clamp(1 - (event.clientY - bounds.top) / bounds.height * 2, -1, 1)
+    }
+    updatePreference()
+    canvas.addEventListener("pointermove", move, { passive: true })
+    canvas.addEventListener("pointerleave", center)
+    canvas.addEventListener("pointercancel", center)
+    window.addEventListener("blur", center)
+    motion.addEventListener("change", updatePreference)
+    pointer.addEventListener("change", updatePreference)
+    return () => {
+      canvas.removeEventListener("pointermove", move)
+      canvas.removeEventListener("pointerleave", center)
+      canvas.removeEventListener("pointercancel", center)
+      window.removeEventListener("blur", center)
+      motion.removeEventListener("change", updatePreference)
+      pointer.removeEventListener("change", updatePreference)
+    }
+  }, [canvas, settings.cursorEnabled])
 
-  return <primitive object={scene} />
+  const clip = actions.Loop ?? Object.values(actions)[0]
+  useEffect(() => {
+    landingLoops.current = 0
+    const countLoop = (event: THREE.AnimationMixerEventMap["loop"]) => {
+      if (event.action === clip) landingLoops.current += event.loopDelta
+    }
+    mixer.addEventListener("loop", countLoop)
+    clip?.reset().play()
+    return () => { mixer.removeEventListener("loop", countLoop); clip?.stop() }
+  }, [clip, mixer])
+  useEffect(() => {
+    if (!clip) return
+    clip.clampWhenFinished = true
+    clip.setLoop(settings.repeat === "once" ? THREE.LoopOnce : settings.repeat === "pingpong" ? THREE.LoopPingPong : THREE.LoopRepeat, Infinity)
+    clip.paused = !settings.playing
+    clip.timeScale = settings.speed
+    if (settings.playing) { clip.enabled = true; clip.play() }
+  }, [clip, settings.playing, settings.speed, settings.repeat])
+  useEffect(() => {
+    if (clip) { clip.time = settings.start; mixer.update(0) }
+  }, [clip, mixer, settings.start])
+
+  useEffect(() => {
+    const originals = new Map<THREE.Mesh, THREE.Material | THREE.Material[]>()
+    const created: THREE.Material[] = []
+    scene.traverse(object => {
+      if (!(object instanceof THREE.Mesh)) return
+      originals.set(object, object.material)
+      const convert = (source: THREE.Material) => {
+        const material = settings.material === "clay" ? new THREE.MeshStandardMaterial({ color: "#d5d5d0", roughness: 0.8 })
+          : settings.material === "normal" ? new THREE.MeshNormalMaterial() : source.clone()
+        if ("wireframe" in material) material.wireframe = settings.wireframe
+        created.push(material)
+        return material
+      }
+      object.material = Array.isArray(object.material) ? object.material.map(convert) : convert(object.material)
+    })
+    return () => { originals.forEach((material, mesh) => { mesh.material = material }); created.forEach(material => material.dispose()) }
+  }, [scene, settings.material, settings.wireframe])
+  useEffect(() => { if (settings.spin === 0) spin.current = 0 }, [settings.spin])
+  useFrame((_, delta) => {
+    const state = cursor.current
+    // Exponential damping reaches 95% of the target within the smoothing time.
+    // Clamp delta so restoring a background tab cannot produce a large jump.
+    const blend = 1 - Math.exp(-3 * Math.min(delta, 0.1) / settings.cursorSmoothing)
+    state.x = THREE.MathUtils.lerp(state.x, state.allowed ? state.targetX : 0, blend)
+    state.y = THREE.MathUtils.lerp(state.y, state.allowed ? state.targetY : 0, blend)
+    // Reduced motion and touch stay exactly at the authored/manual viewpoint.
+    if (!state.allowed) { state.x = 0; state.y = 0 }
+    const direction = settings.cursorReverse ? -1 : 1
+    // Orbit on a sphere centered on the tiger, using world up for elevation.
+    // This avoids rotating around the authored camera's forward axis (a roll).
+    // Keep the authored viewing distance and lens, but make the resting view
+    // exactly perpendicular to the tiger's path: no vertical tilt or roll.
+    // The tiger's group yaw rotates its side normal from +X in world space.
+    if (cameraOrbit.radius === 0) cameraOrbit.radius = authored.position.distanceTo(orbitTarget)
+    cameraOrbit.sphere.set(
+      cameraOrbit.radius,
+      Math.PI / 2,
+      Math.PI / 2 + THREE.MathUtils.degToRad(settings.tigerRotation),
+    )
+    cameraOrbit.sphere.theta += THREE.MathUtils.degToRad(settings.orbit + state.x * settings.cursorHorizontal * direction)
+    cameraOrbit.sphere.phi -= THREE.MathUtils.degToRad(settings.elevation + state.y * settings.cursorVertical * direction)
+    cameraOrbit.sphere.makeSafe()
+    const camera = authored.camera
+    camera.up.set(0, 1, 0)
+    camera.clearViewOffset()
+    let screenBounds: ReturnType<typeof projectedBounds> | null = null
+    for (let attempt = 0; attempt < 3; attempt++) {
+      camera.position.copy(orbitTarget).add(cameraOrbit.offset.setFromSpherical(cameraOrbit.sphere))
+      camera.lookAt(orbitTarget)
+      camera.updateMatrixWorld(true)
+      if (!subjectFrame.count) break
+      screenBounds = projectedBounds(subjectFrame.points, subjectFrame.count, camera, cameraOrbit.sample)
+      // Preserve the desktop shot. Pull back only if the fixed loop envelope would
+      // exceed 84% of either viewport dimension, including on portrait screens.
+      const fit = Math.max((screenBounds.maxX - screenBounds.minX) / 1.68, (screenBounds.maxY - screenBounds.minY) / 1.68)
+      if (fit <= 1 || attempt === 2) break
+      cameraOrbit.sphere.radius *= fit * 1.015
+    }
+    if (screenBounds) {
+      const centerX = (screenBounds.minX + screenBounds.maxX) / 2
+      const centerY = (screenBounds.minY + screenBounds.maxY) / 2
+      // Lens shift centers the fixed framing envelope without chasing animation.
+      // Explicit user framing shifts remain deliberate offsets from center.
+      camera.setViewOffset(size.width, size.height,
+        (centerX + settings.shiftX) * size.width / 2,
+        -(centerY + settings.shiftY) * size.height / 2,
+        size.width, size.height)
+    }
+    // Sample the original camera keys at the exact Loop mixer time. Keeping
+    // this tiny track lossless avoids compression stepping in the vertical dip.
+    // Apply it after stable framing so auto-centering cannot cancel the dip.
+    if (settings.landingMotion && !state.reduced) {
+      const time = clip?.time ?? 0
+      const phase = settings.repeat === "pingpong" && Math.abs(landingLoops.current) % 2 === 1 ? landingKeys.duration - time : time
+      const heightOffset = landing.evaluate(phase)[0]
+      camera.position.y += heightOffset * settings.landingStrength
+      camera.updateMatrixWorld(true)
+    }
+    spin.current += THREE.MathUtils.degToRad(settings.spin) * delta
+    if (root.current) root.current.rotation.y = THREE.MathUtils.degToRad(settings.rotationY) + spin.current
+  }, 0.5)
+  return <group ref={root} position={[settings.positionX, settings.positionY, settings.positionZ]}
+    rotation={[THREE.MathUtils.degToRad(settings.rotationX), THREE.MathUtils.degToRad(settings.rotationY), THREE.MathUtils.degToRad(settings.rotationZ)]} scale={settings.scale}>
+    <primitive object={scene} />
+  </group>
+}
+
+function Lighting({ settings }: { settings: ModelSettings }) {
+  const angle = THREE.MathUtils.degToRad(settings.keyAngle)
+  const height = THREE.MathUtils.degToRad(settings.keyHeight)
+  return <>
+    <hemisphereLight layers-mask={settings.tigerMaterial === "chrome" ? 1 : 3} args={["#dfe9e2", "#1a1f1a", settings.studioLight]} />
+    <directionalLight layers-mask={3} position={[10 * Math.sin(angle) * Math.cos(height), 10 * Math.sin(height), 10 * Math.cos(angle) * Math.cos(height)]} color={settings.keyColor} intensity={settings.keyLight} />
+    <directionalLight position={[-5, 4, -5]} color={settings.rimColor} intensity={settings.rimLight} />
+  </>
 }
 
 /**
  * Renders the scene into a target, hands it to Shader Lab's ASCII pass,
  * and draws the result on a fullscreen quad.
  */
-function AsciiPass() {
+function AsciiPass({ settings, model, onError }: { settings: AsciiSettings; model: ModelSettings; onError?: () => void }) {
   const { gl, scene, camera, size } = useThree()
   const renderer = gl as unknown as WebGPURenderer
   const target = useRef<THREE.RenderTarget | null>(null)
+  const hoverSource = useAsciiHover(renderer, size.width, size.height, settings)
 
-  const columns = columnsFor(size.width)
-  const config = useMemo(() => asciiConfig(columns), [columns])
-  const { postprocessing } = useShaderLab(config, {
+  const columns = settings.autoColumns ? columnsFor(size.width) : settings.columns
+  const config = useMemo(() => asciiConfig(columns, settings), [columns, settings])
+  const postprocessing = useShaderLabPostProcessingSource(config, {
     renderer,
     width: size.width,
     height: size.height,
   })
+
+  const exposure = useMemo(() => uniform(1), [])
+  useEffect(() => { if (postprocessing.error) onError?.() }, [postprocessing.error, onError])
+  useEffect(() => {
+    exposure.value = Math.pow(2, model.exposure)
+    renderer.toneMappingExposure = 1
+    renderer.toneMapping = model.toneMapping === "aces" ? THREE.ACESFilmicToneMapping
+      : model.toneMapping === "neutral" ? THREE.NeutralToneMapping : THREE.NoToneMapping
+  }, [renderer, exposure, model.exposure, model.toneMapping])
 
   const presentScene = useMemo(() => new THREE.Scene(), [])
   const presentCamera = useMemo(() => new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1), [])
@@ -85,14 +247,23 @@ function AsciiPass() {
     () => tslTexture(new THREE.Texture(), vec2(uv().x, float(1).sub(uv().y))),
     [],
   )
+  const cleanTexture = useMemo(
+    () => tslTexture(new THREE.Texture(), vec2(uv().x, float(1).sub(uv().y))),
+    [],
+  )
+  const clearColor = useMemo(() => new THREE.Color(), [])
   const presentMaterial = useMemo(() => {
     const m = new MeshBasicNodeMaterial()
-    m.colorNode = presentTexture.rgb
+    const tigerColor = model.tigerMaterial === "chrome" && model.toneMapping === "none"
+      ? neutralToneMapping(cleanTexture.rgb, float(1)) as typeof cleanTexture.rgb : cleanTexture.rgb
+    m.colorNode = mix(presentTexture.rgb, tigerColor, cleanTexture.a).mul(exposure)
     return m
-  }, [presentTexture])
+  }, [presentTexture, cleanTexture, exposure, model.tigerMaterial, model.toneMapping])
+
+  useEffect(() => () => presentMaterial.dispose(), [presentMaterial])
 
   useEffect(() => {
-    const t = new THREE.RenderTarget(size.width, size.height)
+    const t = new THREE.RenderTarget(size.width, size.height, { type: THREE.HalfFloatType })
     target.current = t
     postprocessing.resize(size.width, size.height)
     return () => {
@@ -104,12 +275,42 @@ function AsciiPass() {
   useFrame((state, delta) => {
     const t = target.current
     if (!t || !postprocessing.ready) return
-    renderer.setRenderTarget(t)
-    renderer.render(scene, camera)
-    const out = postprocessing.render(t.texture, state.clock.elapsedTime, delta)
-    if (out) presentTexture.value = out
-    renderer.setRenderTarget(null)
-    renderer.render(presentScene, presentCamera)
+    const savedLayers = camera.layers.mask
+    const savedBackground = scene.background
+    const savedAutoClear = renderer.autoClear
+    const savedAlpha = renderer.getClearAlpha()
+    renderer.getClearColor(clearColor)
+    try {
+      // First draw only the environment. Its depth buffer stays alive through
+      // the ASCII pass and is reused when drawing the clean tiger below.
+      camera.layers.set(0)
+      renderer.setRenderTarget(t)
+      renderer.autoClear = true
+      renderer.render(scene, camera)
+      const out = postprocessing.update(hoverSource(t.texture, delta), state.clock.elapsedTime, delta)
+      if (out) presentTexture.value = out
+
+      // Keep environment depth, clear only color, and draw the tiger normally.
+      // Foreground tree silhouettes therefore occlude it, even between glyphs.
+      renderer.setRenderTarget(t)
+      renderer.setClearColor(0x000000, 0)
+      renderer.clear(true, false, false)
+      scene.background = null
+      renderer.autoClear = false
+      camera.layers.set(1)
+      renderer.render(scene, camera)
+      cleanTexture.value = t.texture
+
+      renderer.setRenderTarget(null)
+      renderer.autoClear = true
+      renderer.render(presentScene, presentCamera)
+    } finally {
+      camera.layers.mask = savedLayers
+      scene.background = savedBackground
+      renderer.autoClear = savedAutoClear
+      renderer.setClearColor(clearColor, savedAlpha)
+      renderer.setRenderTarget(null)
+    }
   }, 1)
 
   return createPortal(
@@ -121,7 +322,9 @@ function AsciiPass() {
   )
 }
 
-export default function HeroScene({ onError }: { onError?: () => void }) {
+export default function HeroScene({ onError, ascii, model }: { onError?: () => void; ascii: AsciiSettings; model: ModelSettings }) {
+  const orbitTarget = useMemo(() => new THREE.Vector3(0, 1, 0), [])
+  const subjectFrame = useMemo<TigerFrame>(() => ({ points: new Float32Array(0), count: 0 }), [])
   return (
     <Canvas
       // The ASCII grid replaces fine detail anyway: rendering above 1.5x
@@ -139,12 +342,10 @@ export default function HeroScene({ onError }: { onError?: () => void }) {
       }}
     >
       <color attach="background" args={["#000000"]} />
-      {/* The GLB carries no lights. Soft sky/ground fill + one key from the
-          upper left so leaves read as shapes in the luminance signal. */}
-      <hemisphereLight args={["#dfe9e2", "#1a1f1a", 1.2]} />
-      <directionalLight position={[5, 8, 4]} intensity={2.2} />
-      <Plants />
-      <AsciiPass />
+      <Lighting settings={model} />
+      <Plants settings={model} orbitTarget={orbitTarget} subjectFrame={subjectFrame} />
+      <Tiger settings={model} orbitTarget={orbitTarget} subjectFrame={subjectFrame} />
+      <AsciiPass settings={ascii} model={model} onError={onError} />
     </Canvas>
   )
 }

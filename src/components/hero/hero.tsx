@@ -1,31 +1,48 @@
 "use client"
 
 import dynamic from "next/dynamic"
+import Image from "next/image"
+import { SettingsPreset } from "./settings-preset"
+import { PropertiesPanel } from "./properties-panel"
+import { defaultAscii, defaultModel } from "./live-settings"
 import { useEffect, useState } from "react"
 
 const HeroScene = dynamic(() => import("./hero-scene"), { ssr: false })
 
 /**
  * Shader Lab's postprocessing runs on WebGPU only. Browsers without it get
- * a plain black hero for now (a pre-rendered ASCII poster is the TODO).
+ * a static scene poster, including the clean tiger.
  */
 export function Hero() {
+  const [ascii, setAscii] = useState(defaultAscii)
+  const [model, setModel] = useState(defaultModel)
   const [gpu, setGpu] = useState<"checking" | "yes" | "no">("checking")
 
   useEffect(() => {
-    const nav = navigator as Navigator & { gpu?: { requestAdapter(): Promise<unknown> } }
-    if (!nav.gpu) return setGpu("no")
-    nav.gpu
-      .requestAdapter()
-      .then((a) => setGpu(a ? "yes" : "no"))
-      .catch(() => setGpu("no"))
+    let cancelled = false
+    async function checkGpu() {
+      const nav = navigator as Navigator & { gpu?: { requestAdapter(): Promise<unknown> } }
+      try {
+        const adapter = await nav.gpu?.requestAdapter()
+        if (!cancelled) setGpu(adapter ? "yes" : "no")
+      } catch { if (!cancelled) setGpu("no") }
+    }
+    void checkGpu()
+    return () => { cancelled = true }
+
   }, [])
+
+  const liveAscii = { ...defaultAscii, ...ascii, ...(ascii.hoverEnabled === undefined ? { signalWhitePoint: 0.2 } : {}) }
+  const liveModel = { ...defaultModel, ...model }
 
   return (
     <section className="relative h-svh w-full overflow-hidden bg-black">
+      <SettingsPreset ascii={liveAscii} model={liveModel} onAscii={setAscii} onModel={setModel} />
       <div className="absolute inset-0">
-        {gpu === "yes" && <HeroScene onError={() => setGpu("no")} />}
+        {gpu === "no" && <Image src="/models/scene-poster.webp" alt="A running tiger surrounded by an ASCII forest" fill sizes="100vw" className="object-contain" />}
+        {gpu === "yes" && <HeroScene ascii={liveAscii} model={liveModel} onError={() => setGpu("no")} />}
       </div>
+      <PropertiesPanel ascii={liveAscii} model={liveModel} onAscii={setAscii} onModel={setModel} status={gpu} />
     </section>
   )
 }

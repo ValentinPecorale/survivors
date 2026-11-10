@@ -1,3 +1,4 @@
+import type { AsciiSettings } from "./live-settings"
 import type { ShaderLabConfig } from "@basementstudio/shader-lab"
 
 /**
@@ -14,7 +15,7 @@ export function columnsFor(width: number) {
   return Math.round(Math.min(MAX_COLUMNS, Math.max(MIN_COLUMNS, width / CELL_PX)))
 }
 
-export function asciiConfig(columns: number): ShaderLabConfig {
+export function asciiConfig(columns: number, settings?: AsciiSettings): ShaderLabConfig {
   return {
     layers: [
       {
@@ -28,7 +29,6 @@ export function asciiConfig(columns: number): ShaderLabConfig {
         opacity: 1,
         params: {
           input: "luminance",
-          columns,
           breakGrid: "off",
           breakThreshold: 0.06,
           fontFamily: "mono",
@@ -40,13 +40,15 @@ export function asciiConfig(columns: number): ShaderLabConfig {
           monoColor: "#f5f5f0",
           bgOpacity: 0,
           signalBlackPoint: 0,
-          signalWhitePoint: 0.22,
+          signalWhitePoint: 0.2,
           invert: false,
           rowWarp: 0,
+          ...settings,
+          columns,
         },
         saturation: 1,
         type: "ascii",
-        visible: true,
+        visible: settings?.enabled ?? true,
       },
     ],
     // Matches the GLB's "Loop" clip (10.83s) so both cycles stay in phase.
