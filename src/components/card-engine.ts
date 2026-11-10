@@ -18,7 +18,7 @@ type Motion = {
   scrubbed: boolean
   /** Key held down: p follows time through holdEase until released or HOLD_MS elapses. */
   hold: { start: number; replace: number | null } | null
-  tween: { from: number; to: number; start: number; delay: number; dur: number; onDone: () => void } | null
+  tween: { from: number; to: number; start: number; delay: number; dur: number; onDone: () => void; onEarly?: () => void; early?: boolean } | null
 }
 
 export const SLIDE_MS = 900
@@ -26,6 +26,8 @@ export const STAGGER_MS = 70
 /** Follow time constant for scrubbing: ~90ms glides wheel notches without adding easing. */
 const SMOOTH_MS = 90
 const MIN_TWEEN = 0.35
+/** The nav unlocks this long before a slide-in ends, so the next press can start as it lands. */
+export const EARLY_UNLOCK_MS = 100
 /** Hold a section key this long to fully open its card. */
 export const HOLD_MS = 2000
 /** Releasing past this fraction of the hold (1s of 2s) completes the card; before it, the card retreats. */
@@ -77,7 +79,8 @@ export function createCardEngine<Id extends string>(order: readonly Id[], onChan
   const commit = (next: Card<Id>[]) => { cards = next; onChange(next) }
   const live = () => cards.filter(c => !c.closing)
   const front = () => live().at(-1)
-  const busy = () => [...motion.values()].some(m => m.tween || m.hold)
+  const unlocking = (t: NonNullable<Motion["tween"]>, now: number) => !!t.onEarly && now >= t.start + t.delay + t.dur - EARLY_UNLOCK_MS
+  const busy = () => { const now = performance.now(); return [...motion.values()].some(m => m.hold || (m.tween && !unlocking(m.tween, now))) }
 
   const paint = (key: number) => {
     const el = els.get(key)
@@ -106,6 +109,7 @@ export function createCardEngine<Id extends string>(order: readonly Id[], onChan
       } else if (t) {
         const u = (now - t.start - t.delay) / t.dur
         if (u < 0) { active = true; continue }
+        if (!t.early && unlocking(t, now)) { t.early = true; t.onEarly?.() }
         if (u >= 1) { m.p = t.to; m.tween = null; paint(key); t.onDone(); continue }
         m.p = t.from + (t.to - t.from) * ease(u)
         active = true
@@ -130,12 +134,12 @@ export function createCardEngine<Id extends string>(order: readonly Id[], onChan
     raf = requestAnimationFrame(frame)
   }
 
-  const tweenTo = (key: number, to: number, opts: { delay?: number; onDone: () => void }) => {
+  const tweenTo = (key: number, to: number, opts: { delay?: number; onDone: () => void; onEarly?: () => void }) => {
     const m = motion.get(key)
     if (!m) return
     m.target = null
     m.hold = null
-    m.tween = { from: m.p, to, start: performance.now(), delay: opts.delay ?? 0, dur: SLIDE_MS * Math.max(MIN_TWEEN, Math.abs(to - m.p)), onDone: opts.onDone }
+    m.tween = { from: m.p, to, start: performance.now(), delay: opts.delay ?? 0, dur: SLIDE_MS * Math.max(MIN_TWEEN, Math.abs(to - m.p)), onDone: opts.onDone, onEarly: opts.onEarly }
   }
 
   /** A held card is now fully open: drop the older card of the same section it was lifted from. */
@@ -167,24 +171,24 @@ export function createCardEngine<Id extends string>(order: readonly Id[], onChan
       if (busy() || cards.some(c => c.closing)) return
       const top = front()
       const current = top && motion.get(top.key)
-      if (top && current && top.id === id && current.p >= 1 && current.target === null) return
+      if (top && current && top.id === id && (current.tween || (current.p >= 1 && current.target === null))) return
       if (top && current && top.id === id) {
         if (reduced()) { current.p = 1; current.target = null; paint(top.key); return }
         commit(cards.map(c => (c === top ? { ...c, entering: true } : c)))
-        tweenTo(top.key, 1, { onDone: () => settle(top.key) })
+        tweenTo(top.key, 1, { onDone: () => settle(top.key), onEarly: () => settle(top.key) })
         kick()
         return
       }
       // Anything half-scrolled on screen completes alongside the new card.
       for (const card of live()) {
         const m = motion.get(card.key)
-        if (!m || m.p >= 1) continue
+        if (!m || m.p >= 1 || m.tween) continue
         if (reduced()) { m.p = 1; m.target = null; paint(card.key) } else tweenTo(card.key, 1, { onDone: () => {} })
       }
       const { key, next } = spawn(id)
       if (reduced()) { motion.get(key)!.p = 1; commit(next); return }
       commit(next.map(c => (c.key === key ? { ...c, entering: true } : c)))
-      tweenTo(key, 1, { onDone: () => settle(key) })
+      tweenTo(key, 1, { onDone: () => settle(key), onEarly: () => settle(key) })
       kick()
     },
 
@@ -216,7 +220,7 @@ export function createCardEngine<Id extends string>(order: readonly Id[], onChan
       if (raw >= HOLD_COMMIT) {
         const replace = m.hold!.replace
         m.hold = null
-        tweenTo(key, 1, { onDone: () => { m.hold = { start: 0, replace }; finishHold(key) } })
+        tweenTo(key, 1, { onDone: () => { m.hold = { start: 0, replace }; finishHold(key) }, onEarly: () => settle(key) })
       } else {
         tweenTo(key, 0, { onDone: () => remove(key) })
       }
