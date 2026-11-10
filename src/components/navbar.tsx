@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { useEffect, useState } from "react"
-import { createCardEngine, type Card } from "./card-engine"
+import { createCardEngine, HOLD_MS, SLIDE_MS, type Card } from "./card-engine"
 
 /** Each section owns one card. */
 const sections = [
@@ -20,13 +20,14 @@ const SCROLL_TRAVEL = 0.8
  * Centered nav over the hero. Each link owns one full-screen card (three max)
  * stacked over the others.
  *
- * - Nav button: timed slide (900ms, expo in-out). Buttons are locked until it ends.
+ * - Nav button: timed 1.5s slide with an ease-in only (accelerates, stops sharply). Buttons
+ *   are locked until 100ms before it ends.
  * - Scroll / swipe: scrubbed. Down pulls the next section's card in, up pushes
  *   the front card out; its position follows the gesture linearly, so you
  *   scroll normally until the card is fully visible. See card-engine.ts.
- * - Hold a section's letter ([W] [S] [C]) for 1s: the letter fills left to right, the card
- *   creeps in to 25% over that second, and at exactly 1s it plays out the rest of its
- *   slide by itself. Release earlier and the card goes back; holding longer does nothing.
+ * - Hold a section's letter ([W] [S] [C]) for 2s: the letter fills left to right while the card
+ *   creeps in to 30%; at exactly 2s the same 1.5s card slide takes over. The shortcut is only
+ *   the trigger. Release earlier and the card goes back; holding longer does nothing.
  * - Close, Esc or the wordmark clears the whole stack, top card first (70ms stagger).
  *
  * A small rAF engine instead of ScrollTrigger: the page has no document scroll
@@ -44,7 +45,7 @@ export function Navbar() {
   // The clock only runs once no key is held, so a 1s hold plus its slide is never cut short.
   useEffect(() => {
     if (!locked || holdId) return
-    const timer = window.setTimeout(() => engine.finishTweens(), 1400)
+    const timer = window.setTimeout(() => engine.finishTweens(), SLIDE_MS + 600)
     return () => window.clearTimeout(timer)
   }, [locked, holdId, engine])
 
@@ -131,7 +132,7 @@ export function Navbar() {
           <ul>
             {sections.map(s => (
               <li key={s.id}>
-                <button type="button" data-active={top?.id === s.id ? "true" : undefined} aria-disabled={locked || undefined} onClick={() => { if (!locked) engine.open(s.id) }}>{s.label}<kbd aria-hidden="true" data-fill={holdId === s.id ? "true" : undefined}><span>[{s.key.toUpperCase()}]</span></kbd></button>
+                <button type="button" data-active={top?.id === s.id ? "true" : undefined} aria-disabled={locked || undefined} onClick={() => { if (!locked) engine.open(s.id) }}>{s.label}<kbd aria-hidden="true" data-fill={holdId === s.id ? "true" : undefined} style={{ "--hold-ms": `${HOLD_MS}ms` } as React.CSSProperties}><span>[{s.key.toUpperCase()}]</span></kbd></button>
               </li>
             ))}
           </ul>
