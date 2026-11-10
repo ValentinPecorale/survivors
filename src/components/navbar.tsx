@@ -3,11 +3,11 @@
 import Link from "next/link"
 import { useCallback, useEffect, useRef, useState } from "react"
 
-/** Each section owns one card with a fixed tone, so reordering never recolors it. */
+/** Each section owns one card. */
 const sections = [
-  { id: "work", label: "Work", title: "Selected work", body: "Placeholder copy. Projects, case studies and client names will live here once the portfolio is designed.", tone: { bg: "#f5f5f0", fg: "#0b0b0b", light: true } },
-  { id: "studio", label: "Studio", title: "The studio", body: "Placeholder copy. Who we are, how we work and what we believe in.", tone: { bg: "#0b0b0b", fg: "#f5f5f0", light: false } },
-  { id: "contact", label: "Contact", title: "Let's talk", body: "Placeholder copy. Email, socials and a short brief form will live here.", tone: { bg: "#c9ccbf", fg: "#0b0b0b", light: true } },
+  { id: "work", label: "Work", title: "Selected work", body: "Placeholder copy. Projects, case studies and client names will live here once the portfolio is designed." },
+  { id: "studio", label: "Studio", title: "The studio", body: "Placeholder copy. Who we are, how we work and what we believe in." },
+  { id: "contact", label: "Contact", title: "Let's talk", body: "Placeholder copy. Email, socials and a short brief form will live here." },
 ] as const
 
 type SectionId = (typeof sections)[number]["id"]
@@ -63,13 +63,10 @@ export function Navbar() {
   }, [hasCards, closeAll])
 
   const top = live[live.length - 1]
-  // Follow the visually topmost card, even while it is still sliding out.
-  const visibleTop = cards[cards.length - 1]
-  const topTone = visibleTop ? sections.find(s => s.id === visibleTop.id)?.tone ?? null : null
 
   return (
     <>
-      <header className="site-nav" data-on-light={topTone?.light ? "true" : undefined}>
+      <header className="site-nav">
         <Link href="/" className="site-nav-brand" aria-label="Survivors, home" onClick={event => { if (cards.length) { event.preventDefault(); closeAll() } }}>Survivors</Link>
         <nav aria-label="Primary">
           <ul>
@@ -83,7 +80,6 @@ export function Navbar() {
       </header>
       {cards.map((card, index) => {
         const section = sections.find(s => s.id === card.id) ?? sections[0]
-        const tone = section.tone
         const isTop = card === top
         return (
           <aside
@@ -92,7 +88,7 @@ export function Navbar() {
             data-closing={card.closing ? "true" : undefined}
             inert={!isTop}
             aria-label={section.title}
-            style={{ zIndex: 15 + index, animationDelay: card.closing ? `${(cards.length - 1 - index) * 70}ms` : undefined, "--card-bg": tone.bg, "--card-fg": tone.fg } as React.CSSProperties}
+            style={{ zIndex: 15 + index, animationDelay: card.closing ? `${(cards.length - 1 - index) * 70}ms` : undefined }}
             onAnimationEnd={event => {
               if (event.target !== event.currentTarget) return
               if (card.closing) remove(card.key)

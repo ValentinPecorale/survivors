@@ -127,10 +127,8 @@ body {
   padding: 0 24px;
   color: var(--foreground);
   font-family: var(--font-geist-sans), sans-serif;
-  transition: color 500ms cubic-bezier(0.76, 0, 0.24, 1);
   animation: site-nav-enter 700ms cubic-bezier(0.22, 1, 0.36, 1) 150ms both;
 }
-.site-nav[data-on-light="true"] { color: #0b0b0b; }
 .site-nav-brand { position: absolute; left: 24px; font-size: 15px; font-weight: 650; letter-spacing: -0.02em; }
 .site-nav nav { margin: 0 auto; }
 .site-nav ul { display: flex; gap: 32px; list-style: none; margin: 0; padding: 0; }
@@ -147,10 +145,10 @@ body {
   inset: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
-  background: var(--card-bg);
-  color: var(--card-fg);
+  background: #000;
+  color: var(--foreground);
   font-family: var(--font-geist-sans), sans-serif;
-  box-shadow: -32px 0 80px #0006;
+  border-left: 1px solid #ffffff1a;
   animation: site-card-in 900ms cubic-bezier(0.76, 0, 0.24, 1) both;
 }
 .site-card[data-closing="true"] { animation: site-card-out 900ms cubic-bezier(0.76, 0, 0.24, 1) both; pointer-events: none; }
@@ -160,9 +158,9 @@ body {
 .site-card-eyebrow { font-family: var(--font-geist-mono), monospace; font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; opacity: 0.5; }
 .site-card h2 { font-size: clamp(44px, 9vw, 120px); font-weight: 650; letter-spacing: -0.04em; line-height: 0.95; }
 .site-card-inner > p:not(.site-card-eyebrow) { max-width: 46ch; font-size: 17px; line-height: 1.5; opacity: 0.7; }
-.site-card-close { align-self: flex-start; margin-top: 12px; font: inherit; font-size: 13px; padding: 10px 18px; border: 1px solid color-mix(in srgb, var(--card-fg) 25%, transparent); border-radius: 999px; background: none; color: inherit; cursor: pointer; transition: background 200ms ease-out, color 200ms ease-out; }
-.site-card-close:hover { background: var(--card-fg); color: var(--card-bg); }
-.site-card button:focus-visible { outline: 2px solid var(--card-fg); outline-offset: 4px; }
+.site-card-close { align-self: flex-start; margin-top: 12px; font: inherit; font-size: 13px; padding: 10px 18px; border: 1px solid color-mix(in srgb, var(--foreground) 25%, transparent); border-radius: 999px; background: none; color: inherit; cursor: pointer; transition: background 200ms ease-out, color 200ms ease-out; }
+.site-card-close:hover { background: var(--foreground); color: #000; }
+.site-card button:focus-visible { outline: 2px solid var(--foreground); outline-offset: 4px; }
 @media (max-width: 640px) {
   .site-nav { padding: 0 16px; }
   .site-nav-brand { left: 16px; font-size: 13px; }
