@@ -8,6 +8,9 @@ import { PropertiesPanel } from "./properties-panel"
 import { defaultAscii, defaultModel } from "./live-settings"
 import { useEffect, useState } from "react"
 
+/** Resting ASCII white point while a key is held; hover is clamped so the cursor never dims the glyphs. */
+const HELD_WHITE_POINT = 0.09
+
 const HeroScene = dynamic(() => import("./hero-scene"), { ssr: false })
 
 /**
@@ -37,7 +40,7 @@ export function Hero() {
   const liveModel = { ...defaultModel, ...model }
   // Holding a key re-types the scene in that glyph. A leading space keeps the darkest tones empty so the forms still read.
   const heldKey = useHeldKey()
-  const sceneAscii = heldKey ? { ...liveAscii, charset: "custom", customChars: " " + heldKey } : liveAscii
+  const sceneAscii = heldKey ? { ...liveAscii, charset: "custom", customChars: " " + heldKey, signalWhitePoint: HELD_WHITE_POINT, hoverWhitePoint: Math.min(liveAscii.hoverWhitePoint, HELD_WHITE_POINT) } : liveAscii
 
   return (
     <section className="relative h-svh w-full overflow-hidden bg-black">
