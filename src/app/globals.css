@@ -149,11 +149,11 @@ body {
   color: var(--foreground);
   font-family: var(--font-geist-sans), sans-serif;
   border-left: 1px solid #ffffff1a;
-  animation: site-card-in 900ms cubic-bezier(0.76, 0, 0.24, 1) both;
+  /* Off-screen right until card-engine.ts takes over the transform. */
+  transform: translateX(100%);
+  will-change: transform;
 }
-.site-card[data-closing="true"] { animation: site-card-out 900ms cubic-bezier(0.76, 0, 0.24, 1) both; pointer-events: none; }
-@keyframes site-card-in { from { transform: translateX(100%); } to { transform: none; } }
-@keyframes site-card-out { from { transform: none; } to { transform: translateX(100%); } }
+.site-card[data-closing="true"] { pointer-events: none; }
 .site-card-inner { min-height: 100vh; min-height: 100svh; width: 100%; display: flex; flex-direction: column; justify-content: center; gap: 20px; padding: 96px clamp(24px, 8vw, 120px) 48px; }
 .site-card-eyebrow { font-family: var(--font-geist-mono), monospace; font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; opacity: 0.5; }
 .site-card h2 { font-size: clamp(44px, 9vw, 120px); font-weight: 650; letter-spacing: -0.04em; line-height: 0.95; }
@@ -168,5 +168,4 @@ body {
 }
 @media (prefers-reduced-motion: reduce) {
   .site-nav { animation: none; }
-  .site-card, .site-card[data-closing="true"] { animation: none; }
 }
