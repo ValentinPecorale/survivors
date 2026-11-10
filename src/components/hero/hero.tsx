@@ -3,6 +3,7 @@
 import dynamic from "next/dynamic"
 import Image from "next/image"
 import { SettingsPreset } from "./settings-preset"
+import { useHeldKey } from "./held-key"
 import { PropertiesPanel } from "./properties-panel"
 import { defaultAscii, defaultModel } from "./live-settings"
 import { useEffect, useState } from "react"
@@ -34,13 +35,16 @@ export function Hero() {
 
   const liveAscii = { ...defaultAscii, ...ascii, ...(ascii.hoverEnabled === undefined ? { signalWhitePoint: 0.2 } : {}) }
   const liveModel = { ...defaultModel, ...model }
+  // Holding a key re-types the scene in that glyph. A leading space keeps the darkest tones empty so the forms still read.
+  const heldKey = useHeldKey()
+  const sceneAscii = heldKey ? { ...liveAscii, charset: "custom", customChars: " " + heldKey } : liveAscii
 
   return (
     <section className="relative h-svh w-full overflow-hidden bg-black">
       <SettingsPreset ascii={liveAscii} model={liveModel} onAscii={setAscii} onModel={setModel} />
       <div className="absolute inset-0">
         {gpu === "no" && <Image src="/models/scene-poster.webp" alt="A running tiger surrounded by an ASCII forest" fill sizes="100vw" className="object-contain" />}
-        {gpu === "yes" && <HeroScene ascii={liveAscii} model={liveModel} onError={() => setGpu("no")} />}
+        {gpu === "yes" && <HeroScene ascii={sceneAscii} model={liveModel} onError={() => setGpu("no")} />}
       </div>
       <PropertiesPanel ascii={liveAscii} model={liveModel} onAscii={setAscii} onModel={setModel} status={gpu} />
     </section>
