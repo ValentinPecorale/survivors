@@ -44,7 +44,7 @@ See [Shader Lab chrome provenance](third-party/shader-lab-chrome.md).
 
 Next.js App Router + TypeScript + Tailwind, React Three Fiber/drei and Three.js WebGPU. Shader Lab provides ASCII postprocessing. GSAP and Lenis are installed for future choreography.
 
-- `public/models/plants.glb`: compressed environment, approximately 6.26 MB.
+- `public/models/plants.glb`: compressed environment incl. 12 animated tiger-paw dust puffs (`Dust_*`, material `Dust_Puff`, depthWrite off), approximately 3.4 MB; built from plants_loop.glb with gltf-transform webp + meshopt.
 - `public/models/tiger.glb`: meshopt-compressed tiger, approximately 315 KB; 4,650 triangles and a 1024×1024 texture.
 - `public/environments/studio_small_03_1k.hdr`: Studio reflections, approximately 1.7 MB.
 - `public/models/scene-poster.webp`: static fallback when WebGPU is unavailable.

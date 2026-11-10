@@ -16,7 +16,7 @@ import { useAsciiHover } from "./ascii-hover"
 import { Tiger } from "./tiger"
 import { asciiConfig, columnsFor } from "./ascii-config"
 
-const MODEL_URL = "/models/plants.glb?v=landing-20261110"
+const MODEL_URL = "/models/plants.glb?v=dust-20261110"
 useGLTF.preload(MODEL_URL)
 
 /** Aspect the shot was framed for in Blender (camera.aspectRatio in the GLB). */
@@ -127,6 +127,8 @@ function Plants({ settings, orbitTarget, subjectFrame }: { settings: ModelSettin
         const material = settings.material === "clay" ? new THREE.MeshStandardMaterial({ color: "#d5d5d0", roughness: 0.8 })
           : settings.material === "normal" ? new THREE.MeshNormalMaterial() : source.clone()
         if ("wireframe" in material) material.wireframe = settings.wireframe
+        // Dust puffs sit at the tiger's paws; writing depth would clip the legs drawn afterwards.
+        if (source.name === "Dust_Puff") material.depthWrite = false
         created.push(material)
         return material
       }
