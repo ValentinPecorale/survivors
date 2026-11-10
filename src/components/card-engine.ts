@@ -16,7 +16,7 @@ type Motion = {
   p: number
   target: number | null
   scrubbed: boolean
-  /** Key held down: p follows time through holdEase until released or HOLD_MS elapses. */
+  /** Key held down: p creeps toward HOLD_PEEK through holdEase until released or HOLD_MS commits it. */
   hold: { start: number; replace: number | null } | null
   tween: { from: number; to: number; start: number; delay: number; dur: number; onDone: () => void; onEarly?: () => void; early?: boolean } | null
 }
@@ -28,10 +28,10 @@ const SMOOTH_MS = 90
 const MIN_TWEEN = 0.35
 /** The nav unlocks this long before a slide-in ends, so the next press can start as it lands. */
 export const EARLY_UNLOCK_MS = 100
-/** Hold a section key this long to fully open its card. */
-export const HOLD_MS = 2000
-/** Releasing past this fraction of the hold (1s of 2s) completes the card; before it, the card retreats. */
-export const HOLD_COMMIT = 0.5
+/** Hold a section key this long to commit: its card then plays out the rest of its slide by itself. */
+export const HOLD_MS = 1000
+/** While holding, the card only creeps in this far (25% visible) by the time the hold commits. */
+export const HOLD_PEEK = 0.25
 
 /** cubic-bezier(x1, y1, x2, y2) solver, same curve CSS uses. */
 function cubicBezier(x1: number, y1: number, x2: number, y2: number) {
@@ -63,7 +63,7 @@ function cubicBezier(x1: number, y1: number, x2: number, y2: number) {
   }
 }
 const ease = cubicBezier(0.76, 0, 0.24, 1)
-/** Hold-to-open curve over the 2s hold: softer than the button slide so the card eases in, then eases out. Symmetric, so 1s of holding is exactly 50%. */
+/** Hold creep curve over the 1s hold: ease in-out, so the card barely moves at first, then eases to its 25% peek. */
 const holdEase = cubicBezier(0.65, 0, 0.35, 1)
 const clamp01 = (v: number) => Math.min(1, Math.max(0, v))
 
@@ -103,9 +103,11 @@ export function createCardEngine<Id extends string>(order: readonly Id[], onChan
       const t = m.tween
       if (m.hold) {
         const raw = clamp01((now - m.hold.start) / HOLD_MS)
-        m.p = holdEase(raw)
-        if (raw >= 1) { paint(key); finishHold(key); continue }
+        m.p = HOLD_PEEK * holdEase(raw)
+        if (raw >= 1) { paint(key); commitHold(key); active = true; continue }
+        paint(key)
         active = true
+        continue
       } else if (t) {
         const u = (now - t.start - t.delay) / t.dur
         if (u < 0) { active = true; continue }
@@ -151,6 +153,14 @@ export function createCardEngine<Id extends string>(order: readonly Id[], onChan
     commit(cards.filter(c => c.key !== replace).map(c => (c.key === key ? { ...c, entering: false } : c)))
   }
 
+  /** The hold reached HOLD_MS: slide the card the rest of the way on its own. Holding longer changes nothing. */
+  const commitHold = (key: number) => {
+    const m = motion.get(key)
+    if (!m?.hold) return
+    const replace = m.hold.replace
+    tweenTo(key, 1, { onDone: () => { m.hold = { start: 0, replace }; finishHold(key) }, onEarly: () => settle(key) })
+  }
+
   /** Appends a card for `id` at p = 0, dropping any older live card of the same section. */
   const spawn = (id: Id) => {
     const key = nextKey++
@@ -193,8 +203,8 @@ export function createCardEngine<Id extends string>(order: readonly Id[], onChan
     },
 
     /**
-     * Key pressed: the section's card starts sliding in, linear in time over
-     * HOLD_MS. If the section already has a card lower in the stack it stays
+     * Key pressed: the section's card starts creeping in (to HOLD_PEEK over
+     * HOLD_MS) and commits if the key is still down at HOLD_MS. If the section already has a card lower in the stack it stays
      * put until this one commits, so an aborted hold loses nothing.
      */
     holdStart(id: Id) {
@@ -208,22 +218,14 @@ export function createCardEngine<Id extends string>(order: readonly Id[], onChan
       return true
     },
 
-    /** Key released: past HOLD_COMMIT the card finishes opening, before it the card returns to where it started. */
+    /** Key released before HOLD_MS: the card goes back to where it started and is removed. */
     holdEnd() {
       const held = [...motion].find(([, m]) => m.hold)
       if (!held) return
       const [key, m] = held
-      // Commit on time held (1s of 2s), not on eased position.
-      const raw = clamp01((performance.now() - m.hold!.start) / HOLD_MS)
-      m.p = holdEase(raw)
+      m.p = HOLD_PEEK * holdEase(clamp01((performance.now() - m.hold!.start) / HOLD_MS))
       paint(key)
-      if (raw >= HOLD_COMMIT) {
-        const replace = m.hold!.replace
-        m.hold = null
-        tweenTo(key, 1, { onDone: () => { m.hold = { start: 0, replace }; finishHold(key) }, onEarly: () => settle(key) })
-      } else {
-        tweenTo(key, 0, { onDone: () => remove(key) })
-      }
+      tweenTo(key, 0, { onDone: () => remove(key) })
       kick()
     },
 

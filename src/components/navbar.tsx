@@ -24,9 +24,9 @@ const SCROLL_TRAVEL = 0.8
  * - Scroll / swipe: scrubbed. Down pulls the next section's card in, up pushes
  *   the front card out; its position follows the gesture linearly, so you
  *   scroll normally until the card is fully visible. See card-engine.ts.
- * - Hold a section's letter ([W] [S] [C]) for 2s: its card slides in linearly with
- *   the hold (ease in-out, cubic-bezier(0.65, 0, 0.35, 1) over 2s). Release before 1s
- *   and it returns; after 1s it finishes opening.
+ * - Hold a section's letter ([W] [S] [C]) for 1s: the letter fills left to right, the card
+ *   creeps in to 25% over that second, and at exactly 1s it plays out the rest of its
+ *   slide by itself. Release earlier and the card goes back; holding longer does nothing.
  * - Close, Esc or the wordmark clears the whole stack, top card first (70ms stagger).
  *
  * A small rAF engine instead of ScrollTrigger: the page has no document scroll
@@ -37,13 +37,16 @@ export function Navbar() {
   const [engine] = useState(() => createCardEngine<SectionId>(sections.map(s => s.id), setCards))
   useEffect(() => () => engine.destroy(), [engine])
 
+  /** Section whose key is currently held; drives the fill on its [letter]. */
+  const [holdId, setHoldId] = useState<SectionId | null>(null)
   const locked = cards.some(c => c.entering)
   // Safety net: if the browser never reports animation frames (hidden tab), unlock after the slide should have finished.
+  // The clock only runs once no key is held, so a 1s hold plus its slide is never cut short.
   useEffect(() => {
-    if (!locked) return
+    if (!locked || holdId) return
     const timer = window.setTimeout(() => engine.finishTweens(), 1400)
     return () => window.clearTimeout(timer)
-  }, [locked, engine])
+  }, [locked, holdId, engine])
 
   const live = cards.filter(c => !c.closing)
   const top = live[live.length - 1]
@@ -66,12 +69,12 @@ export function Navbar() {
       const section = sections.find(s => s.key === event.key.toLowerCase())
       if (!section) return
       if (reduced()) { engine.open(section.id); return }
-      if (engine.holdStart(section.id)) holding = section.key
+      if (engine.holdStart(section.id)) { holding = section.key; setHoldId(section.id) }
     }
     const up = (event: KeyboardEvent) => {
-      if (holding && event.key.toLowerCase() === holding) { holding = null; engine.holdEnd() }
+      if (holding && event.key.toLowerCase() === holding) { holding = null; setHoldId(null); engine.holdEnd() }
     }
-    const blur = () => { if (holding) { holding = null; engine.holdEnd() } }
+    const blur = () => { if (holding) { holding = null; setHoldId(null); engine.holdEnd() } }
     window.addEventListener("keydown", down)
     window.addEventListener("keyup", up)
     window.addEventListener("blur", blur)
@@ -128,7 +131,7 @@ export function Navbar() {
           <ul>
             {sections.map(s => (
               <li key={s.id}>
-                <button type="button" data-active={top?.id === s.id ? "true" : undefined} aria-disabled={locked || undefined} onClick={() => { if (!locked) engine.open(s.id) }}>{s.label}<kbd aria-hidden="true">[{s.key.toUpperCase()}]</kbd></button>
+                <button type="button" data-active={top?.id === s.id ? "true" : undefined} aria-disabled={locked || undefined} onClick={() => { if (!locked) engine.open(s.id) }}>{s.label}<kbd aria-hidden="true" data-fill={holdId === s.id ? "true" : undefined}><span>[{s.key.toUpperCase()}]</span></kbd></button>
               </li>
             ))}
           </ul>
