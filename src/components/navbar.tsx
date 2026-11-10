@@ -3,26 +3,20 @@
 import Link from "next/link"
 import { useCallback, useEffect, useRef, useState } from "react"
 
+/** Each section owns one card with a fixed tone, so reordering never recolors it. */
 const sections = [
-  { id: "work", label: "Work", title: "Selected work", body: "Placeholder copy. Projects, case studies and client names will live here once the portfolio is designed." },
-  { id: "studio", label: "Studio", title: "The studio", body: "Placeholder copy. Who we are, how we work and what we believe in." },
-  { id: "contact", label: "Contact", title: "Let's talk", body: "Placeholder copy. Email, socials and a short brief form will live here." },
+  { id: "work", label: "Work", title: "Selected work", body: "Placeholder copy. Projects, case studies and client names will live here once the portfolio is designed.", tone: { bg: "#f5f5f0", fg: "#0b0b0b", light: true } },
+  { id: "studio", label: "Studio", title: "The studio", body: "Placeholder copy. Who we are, how we work and what we believe in.", tone: { bg: "#0b0b0b", fg: "#f5f5f0", light: false } },
+  { id: "contact", label: "Contact", title: "Let's talk", body: "Placeholder copy. Email, socials and a short brief form will live here.", tone: { bg: "#c9ccbf", fg: "#0b0b0b", light: true } },
 ] as const
 
 type SectionId = (typeof sections)[number]["id"]
 type Card = { key: number; id: SectionId; closing: boolean }
 
-/** Tone cycles per stack depth so overlapping cards stay distinguishable. */
-const tones = [
-  { bg: "#f5f5f0", fg: "#0b0b0b", light: true },
-  { bg: "#0b0b0b", fg: "#f5f5f0", light: false },
-  { bg: "#c9ccbf", fg: "#0b0b0b", light: true },
-]
-const MAX_CARDS = 10
-
 /**
- * Centered nav over the hero. Every click on a link stacks a new full-screen
- * card that slides in from the right over the previous ones. Each card is
+ * Centered nav over the hero. Each link owns one full-screen card (three max)
+ * that slides in from the right over the others; re-pressing a link lifts its
+ * card back to the front. Each card is
  * 100vw wide, at least 100vh tall, and scrolls when its content is taller.
  * Close, Esc or the wordmark clears the whole stack, top card first (70ms
  * stagger), revealing the hero.
@@ -32,11 +26,17 @@ export function Navbar() {
   const [cards, setCards] = useState<Card[]>([])
   const nextKey = useRef(0)
 
-  const open = (id: SectionId) =>
-    setCards(current => current.filter(c => !c.closing).length >= MAX_CARDS ? current
-      : [...current, { key: nextKey.current++, id, closing: false }])
-
+  /**
+   * One card per section. Opening a section that is already in the stack lifts
+   * its card to the front and replays the slide-in; the front card is a no-op.
+   */
+  const open = (id: SectionId) => setCards(current => {
+    const front = current.findLast(c => !c.closing)
+    if (front?.id === id) return current
+    return [...current.filter(c => c.closing || c.id !== id), { key: nextKey.current++, id, closing: false }]
+  })
   const remove = (key: number) => setCards(current => current.filter(c => c.key !== key))
+
   /** Closing any card clears the stack so the hero shows again; cards leave top-down. */
   const closeAll = useCallback(() => setCards(current =>
     window.matchMedia("(prefers-reduced-motion: reduce)").matches ? []
@@ -54,7 +54,7 @@ export function Navbar() {
   const top = live[live.length - 1]
   // Follow the visually topmost card, even while it is still sliding out.
   const visibleTop = cards[cards.length - 1]
-  const topTone = visibleTop ? tones[(cards.length - 1) % tones.length] : null
+  const topTone = visibleTop ? sections.find(s => s.id === visibleTop.id)?.tone ?? null : null
 
   return (
     <>
@@ -72,7 +72,7 @@ export function Navbar() {
       </header>
       {cards.map((card, index) => {
         const section = sections.find(s => s.id === card.id) ?? sections[0]
-        const tone = tones[index % tones.length]
+        const tone = section.tone
         const isTop = card === top
         return (
           <aside
@@ -85,7 +85,7 @@ export function Navbar() {
             onAnimationEnd={event => { if (card.closing && event.target === event.currentTarget) remove(card.key) }}
           >
             <div className="site-card-inner">
-              <p className="site-card-eyebrow">{String(index + 1).padStart(2, "0")} — {section.label}</p>
+              <p className="site-card-eyebrow">{String(sections.indexOf(section) + 1).padStart(2, "0")} — {section.label}</p>
               <h2>{section.title}</h2>
               <p>{section.body}</p>
               <button type="button" className="site-card-close" onClick={closeAll}>Close</button>
