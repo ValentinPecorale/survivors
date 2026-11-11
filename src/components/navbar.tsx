@@ -26,8 +26,8 @@ const SCROLL_TRAVEL = 0.8
  *   the front card out; its position follows the gesture linearly, so you
  *   scroll normally until the card is fully visible. See card-engine.ts.
  * - Hold a section's letter ([W] [S] [C]) for 2s: the letter fills left to right while the card
- *   creeps in to 30%; at exactly 2s the same 1.5s card slide takes over. The shortcut is only
- *   the trigger. Release earlier and the card goes back; holding longer does nothing.
+ *   creeps in to 30% (ease-out); at exactly 2s it finishes 30% to 100% in 0.5s, linear.
+ *   Release earlier and the card goes back; holding longer does nothing.
  * - Close, Esc or the wordmark clears the whole stack, top card first (70ms stagger).
  *
  * A small rAF engine instead of ScrollTrigger: the page has no document scroll

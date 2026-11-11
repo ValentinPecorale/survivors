@@ -18,7 +18,7 @@ type Motion = {
   scrubbed: boolean
   /** Key held down: p creeps toward HOLD_PEEK through holdEase until released or HOLD_MS commits it. */
   hold: { start: number; replace: number | null } | null
-  tween: { from: number; to: number; start: number; delay: number; dur: number; onDone: () => void; onEarly?: () => void; early?: boolean } | null
+  tween: { from: number; to: number; start: number; delay: number; dur: number; onDone: () => void; onEarly?: () => void; early?: boolean; ease?: (t: number) => number } | null
 }
 
 /** The card animation: full 0 to 1 slide. */
@@ -33,6 +33,8 @@ export const EARLY_UNLOCK_MS = 100
 export const HOLD_MS = 2000
 /** While holding, the card only creeps in this far (30% visible) by the time the hold commits. */
 export const HOLD_PEEK = 0.3
+/** After the hold commits, the card finishes 30% to 100% in this long, linear. */
+export const HOLD_FINISH_MS = 500
 
 /** cubic-bezier(x1, y1, x2, y2) solver, same curve CSS uses. */
 function cubicBezier(x1: number, y1: number, x2: number, y2: number) {
@@ -65,8 +67,9 @@ function cubicBezier(x1: number, y1: number, x2: number, y2: number) {
 }
 /** Ease-in only (quartic): the card accelerates all the way and stops sharply at full speed, no ease-out. */
 const ease = cubicBezier(0.5, 0, 0.75, 0)
-/** Hold creep curve over the 2s hold: ease in-out, so the card barely moves at first and is at rest at its 30% peek, ready for the slide to take over. */
-const holdEase = cubicBezier(0.65, 0, 0.35, 1)
+/** Hold creep over the 2s hold: ease-out (quartic). The card moves fastest at the start and settles to rest at its 30% peek. */
+const holdEase = cubicBezier(0.25, 1, 0.5, 1)
+const linear = (t: number) => t
 const clamp01 = (v: number) => Math.min(1, Math.max(0, v))
 
 export function createCardEngine<Id extends string>(order: readonly Id[], onChange: (cards: Card<Id>[]) => void) {
@@ -115,7 +118,7 @@ export function createCardEngine<Id extends string>(order: readonly Id[], onChan
         if (u < 0) { active = true; continue }
         if (!t.early && unlocking(t, now)) { t.early = true; t.onEarly?.() }
         if (u >= 1) { m.p = t.to; m.tween = null; paint(key); t.onDone(); continue }
-        m.p = t.from + (t.to - t.from) * ease(u)
+        m.p = t.from + (t.to - t.from) * (t.ease ?? ease)(u)
         active = true
       } else if (m.target !== null) {
         const diff = m.target - m.p
@@ -138,12 +141,12 @@ export function createCardEngine<Id extends string>(order: readonly Id[], onChan
     raf = requestAnimationFrame(frame)
   }
 
-  const tweenTo = (key: number, to: number, opts: { delay?: number; full?: boolean; onDone: () => void; onEarly?: () => void }) => {
+  const tweenTo = (key: number, to: number, opts: { delay?: number; full?: boolean; ms?: number; linear?: boolean; onDone: () => void; onEarly?: () => void }) => {
     const m = motion.get(key)
     if (!m) return
     m.target = null
     m.hold = null
-    m.tween = { from: m.p, to, start: performance.now(), delay: opts.delay ?? 0, dur: opts.full ? SLIDE_MS : SLIDE_MS * Math.max(MIN_TWEEN, Math.abs(to - m.p)), onDone: opts.onDone, onEarly: opts.onEarly }
+    m.tween = { from: m.p, to, start: performance.now(), delay: opts.delay ?? 0, dur: opts.ms ?? (opts.full ? SLIDE_MS : SLIDE_MS * Math.max(MIN_TWEEN, Math.abs(to - m.p))), onDone: opts.onDone, onEarly: opts.onEarly, ease: opts.linear ? linear : undefined }
   }
 
   /** A held card is now fully open: drop the older card of the same section it was lifted from. */
@@ -155,12 +158,12 @@ export function createCardEngine<Id extends string>(order: readonly Id[], onChan
     commit(cards.filter(c => c.key !== replace).map(c => (c.key === key ? { ...c, entering: false } : c)))
   }
 
-  /** The hold reached HOLD_MS: slide the card the rest of the way on its own. Holding longer changes nothing. */
+  /** The hold reached HOLD_MS: finish the card (linear, HOLD_FINISH_MS). Holding longer changes nothing. */
   const commitHold = (key: number) => {
     const m = motion.get(key)
     if (!m?.hold) return
     const replace = m.hold.replace
-    tweenTo(key, 1, { full: true, onDone: () => { m.hold = { start: 0, replace }; finishHold(key) }, onEarly: () => settle(key) })
+    tweenTo(key, 1, { ms: HOLD_FINISH_MS, linear: true, onDone: () => { m.hold = { start: 0, replace }; finishHold(key) }, onEarly: () => settle(key) })
   }
 
   /** Appends a card for `id` at p = 0, dropping any older live card of the same section. */
