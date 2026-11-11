@@ -24,7 +24,7 @@ type Motion = {
   tween: { from: number; to: number; start: number; delay: number; dur: number; onDone: () => void; onEarly?: () => void; early?: boolean; ease?: (t: number) => number } | null
 }
 
-/** The card animation: full 0 to 1 slide. */
+/** Base duration for partial slides (a released hold retreating). Opening a card uses openMs from card-settings.ts. */
 export const SLIDE_MS = 1500
 /** Follow time constant for scrubbing: ~90ms glides wheel notches without adding easing. */
 const SMOOTH_MS = 90
@@ -112,7 +112,7 @@ export function createCardEngine<Id extends string>(order: readonly Id[], onChan
     if (!m) return
     m.target = null
     m.hold = null
-    m.tween = { from: m.p, to, start: performance.now(), delay: opts.delay ?? 0, dur: opts.ms ?? (opts.full ? SLIDE_MS : SLIDE_MS * Math.max(MIN_TWEEN, Math.abs(to - m.p))), onDone: opts.onDone, onEarly: opts.onEarly, ease: opts.ease }
+    m.tween = { from: m.p, to, start: performance.now(), delay: opts.delay ?? 0, dur: opts.ms ?? (opts.full ? getCardSettings().openMs : SLIDE_MS * Math.max(MIN_TWEEN, Math.abs(to - m.p))), onDone: opts.onDone, onEarly: opts.onEarly, ease: opts.ease ?? (opts.full ? bezierEase(getCardSettings().openEase) : undefined) }
   }
 
   /** A held card is now fully open: drop the older card of the same section it was lifted from. */

@@ -190,6 +190,11 @@ export function PropertiesPanel({ ascii, model, onAscii, onModel, status }: Prop
         </div>
       </> : tab === "cards" ? <>
         <div className="property-card">
+          <Group title="Open · nav button">
+            <Range label="Duration · ms" value={cards.openMs} min={200} max={3000} step={50} onChange={v => c("openMs", v)} />
+            <EaseEditor label="Ease" value={cards.openEase} onChange={v => c("openEase", v)} />
+            <p className="property-help">The slide when you click Work, Studio or Contact. Buttons unlock 100ms before it ends.</p>
+          </Group>
           <Group title="Hold trigger">
             <Range label="Hold · ms" value={cards.holdMs} min={300} max={3000} step={50} onChange={v => c("holdMs", v)} />
             <Range label="Creep to · %" value={cards.peekPct} min={5} max={60} step={1} onChange={v => c("peekPct", v)} />

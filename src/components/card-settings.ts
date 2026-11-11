@@ -11,6 +11,10 @@ export type Bezier = [number, number, number, number]
  * the engine and the panel live in different trees.
  */
 export const defaultCardSettings = {
+  /** Open by nav button: time for the card to slide from off-screen to fully in. */
+  openMs: 1500,
+  /** Easing of the open slide. Default is quartic ease-in: accelerates and stops sharply. */
+  openEase: [0.5, 0, 0.75, 0] as Bezier,
   /** Hold this long to trigger the card. */
   holdMs: 1200,
   /** How much of the card is visible by the time the hold ends, in percent. */
@@ -72,6 +76,8 @@ export function loadCardSettings() {
     const saved = JSON.parse(raw) as Partial<Record<keyof CardSettings, unknown>>
     const d = defaultCardSettings
     setCardSettings({
+      openMs: num(saved.openMs, d.openMs, 100, 5000),
+      openEase: isBezier(saved.openEase) ? saved.openEase : d.openEase,
       holdMs: num(saved.holdMs, d.holdMs, 100, 5000),
       peekPct: num(saved.peekPct, d.peekPct, 1, 99),
       creepEase: isBezier(saved.creepEase) ? saved.creepEase : d.creepEase,

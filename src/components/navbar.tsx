@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { useEffect, useState } from "react"
-import { createCardEngine, SLIDE_MS, type Card } from "./card-engine"
+import { createCardEngine, type Card } from "./card-engine"
 import { loadCardSettings, useCardSettings } from "./card-settings"
 
 /** Each section owns one card. */
@@ -21,8 +21,8 @@ const SCROLL_TRAVEL = 0.8
  * Centered nav over the hero. Each link owns one full-screen card (three max)
  * stacked over the others.
  *
- * - Nav button: timed 1.5s slide with an ease-in only (accelerates, stops sharply). Buttons
- *   are locked until 100ms before it ends.
+ * - Nav button: timed slide (duration and ease in the properties panel, Cards tab; default 1.5s
+ *   quartic ease-in). Buttons are locked until 100ms before it ends.
  * - Scroll / swipe: scrubbed. Down pulls the next section's card in, up pushes
  *   the front card out; its position follows the gesture linearly, so you
  *   scroll normally until the card is fully visible. See card-engine.ts.
@@ -41,16 +41,16 @@ export function Navbar() {
 
   /** Section whose key is currently held; drives the fill on its [letter]. */
   const [holdId, setHoldId] = useState<SectionId | null>(null)
-  const { holdMs } = useCardSettings()
+  const { holdMs, openMs } = useCardSettings()
   useEffect(() => { loadCardSettings() }, [])
   const locked = cards.some(c => c.entering)
   // Safety net: if the browser never reports animation frames (hidden tab), unlock after the slide should have finished.
   // The clock only runs once no key is held, so a 1s hold plus its slide is never cut short.
   useEffect(() => {
     if (!locked || holdId) return
-    const timer = window.setTimeout(() => engine.finishTweens(), SLIDE_MS + 600)
+    const timer = window.setTimeout(() => engine.finishTweens(), openMs + 600)
     return () => window.clearTimeout(timer)
-  }, [locked, holdId, engine])
+  }, [locked, holdId, openMs, engine])
 
   const live = cards.filter(c => !c.closing)
   const top = live[live.length - 1]
