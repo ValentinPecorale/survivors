@@ -172,8 +172,11 @@ function Plants({ settings, orbitTarget, subjectFrame }: { settings: ModelSettin
     const elevation = mix(settings.elevation, target.camElevation)
     const shiftX = mix(settings.shiftX, target.camShiftX)
     const shiftY = mix(settings.shiftY, target.camShiftY)
-    cameraOrbit.sphere.theta += THREE.MathUtils.degToRad(orbit + state.x * settings.cursorHorizontal * direction)
-    cameraOrbit.sphere.phi -= THREE.MathUtils.degToRad(elevation + state.y * settings.cursorVertical * direction)
+    // The cursor orbit fades with the scroll camera (to 0 by default), so the high view stays still.
+    const cursorH = mix(settings.cursorHorizontal, target.camCursorHorizontal)
+    const cursorV = mix(settings.cursorVertical, target.camCursorVertical)
+    cameraOrbit.sphere.theta += THREE.MathUtils.degToRad(orbit + state.x * cursorH * direction)
+    cameraOrbit.sphere.phi -= THREE.MathUtils.degToRad(elevation + state.y * cursorV * direction)
     cameraOrbit.sphere.makeSafe()
     const camera = authored.camera
     camera.up.set(0, 1, 0)

@@ -197,6 +197,8 @@ export function PropertiesPanel({ ascii, model, onAscii, onModel, status }: Prop
             <Range label="Elevation" value={cards.camElevation} min={-60} max={60} step={1} onChange={v => c("camElevation", v)} />
             <Range label="Shift X" value={cards.camShiftX} min={-1} max={1} onChange={v => c("camShiftX", v)} />
             <Range label="Shift Y" value={cards.camShiftY} min={-1} max={1} onChange={v => c("camShiftY", v)} />
+            <Range label="Cursor orbit · horizontal °" value={cards.camCursorHorizontal} min={0} max={30} step={0.1} onChange={v => c("camCursorHorizontal", v)} />
+            <Range label="Cursor orbit · vertical °" value={cards.camCursorVertical} min={0} max={30} step={0.1} onChange={v => c("camCursorVertical", v)} />
           </Group>
           <Group title="Open · nav button">
             <Range label="Duration · ms" value={cards.openMs} min={200} max={3000} step={50} onChange={v => c("openMs", v)} />

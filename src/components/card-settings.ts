@@ -20,6 +20,9 @@ export const defaultCardSettings = {
   camElevation: 60,
   camShiftX: 0,
   camShiftY: 0,
+  /** Cursor orbit (degrees, Camera tab: Horizontal / Vertical orbit) once the scroll camera has arrived. 0 = the view holds still. */
+  camCursorHorizontal: 0,
+  camCursorVertical: 0,
   /** Open by nav button: time for the card to slide from off-screen to fully in. */
   openMs: 1500,
   /** Easing of the open slide. Default is quartic ease-in: accelerates and stops sharply. */
@@ -97,6 +100,8 @@ export function loadCardSettings() {
       camElevation: num(saved.camElevation, d.camElevation, -60, 60),
       camShiftX: num(saved.camShiftX, d.camShiftX, -1, 1),
       camShiftY: num(saved.camShiftY, d.camShiftY, -1, 1),
+      camCursorHorizontal: num(saved.camCursorHorizontal, d.camCursorHorizontal, 0, 30),
+      camCursorVertical: num(saved.camCursorVertical, d.camCursorVertical, 0, 30),
       openMs: num(saved.openMs, d.openMs, 100, 5000),
       openEase: isBezier(saved.openEase) ? saved.openEase : d.openEase,
       holdMs: num(saved.holdMs, d.holdMs, 100, 5000),
