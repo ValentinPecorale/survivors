@@ -11,6 +11,15 @@ export type Bezier = [number, number, number, number]
  * the engine and the panel live in different trees.
  */
 export const defaultCardSettings = {
+  /**
+   * Scroll camera: scrolling down from the hero first blends the camera from the
+   * Camera tab settings to these (linear with scroll), then the first card enters.
+   */
+  camFocal: 37,
+  camOrbit: 0,
+  camElevation: 60,
+  camShiftX: 0,
+  camShiftY: 0,
   /** Open by nav button: time for the card to slide from off-screen to fully in. */
   openMs: 1500,
   /** Easing of the open slide. Default is quartic ease-in: accelerates and stops sharply. */
@@ -56,6 +65,13 @@ export function bezierEase(b: Bezier) {
   return fn
 }
 
+/**
+ * Scroll camera progress, 0 (Camera tab settings) to 1 (scroll camera target).
+ * Written by card-engine.ts every frame, read by hero-scene.tsx every frame.
+ * A plain mutable object on purpose: no React re-render per frame.
+ */
+export const scrollCamera = { progress: 0 }
+
 let current: CardSettings = defaultCardSettings
 const listeners = new Set<() => void>()
 const emit = () => listeners.forEach(l => l())
@@ -76,6 +92,11 @@ export function loadCardSettings() {
     const saved = JSON.parse(raw) as Partial<Record<keyof CardSettings, unknown>>
     const d = defaultCardSettings
     setCardSettings({
+      camFocal: num(saved.camFocal, d.camFocal, 15, 120),
+      camOrbit: num(saved.camOrbit, d.camOrbit, -180, 180),
+      camElevation: num(saved.camElevation, d.camElevation, -60, 60),
+      camShiftX: num(saved.camShiftX, d.camShiftX, -1, 1),
+      camShiftY: num(saved.camShiftY, d.camShiftY, -1, 1),
       openMs: num(saved.openMs, d.openMs, 100, 5000),
       openEase: isBezier(saved.openEase) ? saved.openEase : d.openEase,
       holdMs: num(saved.holdMs, d.holdMs, 100, 5000),

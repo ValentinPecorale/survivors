@@ -131,7 +131,7 @@ export function Navbar() {
   return (
     <>
       <header className="site-nav">
-        <Link href="/" className="site-nav-brand" aria-label="Survivors, home" onClick={event => { if (cards.length) { event.preventDefault(); engine.closeAll() } }}>Survivors</Link>
+        <Link href="/" className="site-nav-brand" aria-label="Survivors, home" onClick={event => { if (engine.isActive()) { event.preventDefault(); engine.closeAll() } }}>Survivors</Link>
         <nav aria-label="Primary">
           <ul>
             {sections.map(s => (

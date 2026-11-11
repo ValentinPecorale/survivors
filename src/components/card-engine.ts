@@ -11,7 +11,7 @@
  */
 
 import { cubicBezier } from "./bezier"
-import { bezierEase, getCardSettings } from "./card-settings"
+import { bezierEase, getCardSettings, scrollCamera } from "./card-settings"
 
 export type Card<Id extends string = string> = { key: number; id: Id; closing: boolean; entering: boolean }
 
@@ -50,6 +50,8 @@ export function createCardEngine<Id extends string>(order: readonly Id[], onChan
   const live = () => cards.filter(c => !c.closing)
   const front = () => live().at(-1)
   const unlocking = (t: NonNullable<Motion["tween"]>, now: number) => !!t.onEarly && now >= t.start + t.delay + t.dur - EARLY_UNLOCK_MS
+  /** Scroll camera phase that runs before the first card. */
+  const cam: { p: number; target: number | null; tween: { from: number; start: number; delay: number; dur: number; ease: (t: number) => number } | null } = { p: 0, target: null, tween: null }
   const busy = () => { const now = performance.now(); return [...motion.values()].some(m => m.hold || (m.tween && !unlocking(m.tween, now))) }
 
   const paint = (key: number) => {
@@ -99,6 +101,14 @@ export function createCardEngine<Id extends string>(order: readonly Id[], onChan
       }
       paint(key)
     }
+    if (cam.tween) {
+      const u = (now - cam.tween.start - cam.tween.delay) / cam.tween.dur
+      if (u >= 1) { cam.p = 0; cam.tween = null } else { if (u >= 0) cam.p = cam.tween.from * (1 - cam.tween.ease(u)); active = true }
+    } else if (cam.target !== null) {
+      const diff = cam.target - cam.p
+      if (Math.abs(diff) < 0.0005) { cam.p = cam.target; cam.target = null } else { cam.p += diff * (1 - Math.exp(-dt / SMOOTH_MS)); active = true }
+    }
+    scrollCamera.progress = cam.p
     if (active) raf = requestAnimationFrame(frame)
   }
   const kick = () => {
@@ -204,6 +214,14 @@ export function createCardEngine<Id extends string>(order: readonly Id[], onChan
     /** Slide every card out, top first, revealing the hero. */
     closeAll() {
       const open = live()
+      const cfgNow = getCardSettings()
+      const camAt = cam.target ?? cam.p
+      if (camAt > 0.001) {
+        cam.target = null
+        if (reduced()) { cam.p = 0; cam.tween = null; scrollCamera.progress = 0 }
+        else cam.tween = { from: cam.p, start: performance.now(), delay: 0, dur: cfgNow.closeMs * Math.max(MIN_TWEEN, cam.p), ease: bezierEase(cfgNow.closeEase) }
+        kick()
+      }
       if (!open.length) return
       if (reduced()) { motion.clear(); commit([]); return }
       commit(cards.map(c => ({ ...c, closing: true, entering: false })))
@@ -225,6 +243,17 @@ export function createCardEngine<Id extends string>(order: readonly Id[], onChan
      */
     scrub(amount: number) {
       if (!amount || busy() || cards.some(c => c.closing)) return
+      // With no card open, scrolling drives the camera first; the first card only
+      // enters once the camera has fully arrived, and leaves before it travels back.
+      if (live().length === 0) {
+        const at = cam.target ?? cam.p
+        if (amount < 0 || at < 1) {
+          cam.tween = null
+          cam.target = clamp01(at + amount)
+          kick()
+          return
+        }
+      }
       let driver = front()
       const effective = driver && (motion.get(driver.key)?.target ?? motion.get(driver.key)?.p ?? 1)
       if (amount > 0 && (!driver || (effective ?? 1) >= 1)) {
@@ -260,6 +289,9 @@ export function createCardEngine<Id extends string>(order: readonly Id[], onChan
         t.onDone()
       }
     },
+
+    /** True while any card is open or the scroll camera is away from home. */
+    isActive() { return cards.length > 0 || (cam.target ?? cam.p) > 0.001 || !!cam.tween },
 
     destroy() { cancelAnimationFrame(raf); raf = 0 },
   }

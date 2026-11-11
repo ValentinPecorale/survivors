@@ -190,6 +190,14 @@ export function PropertiesPanel({ ascii, model, onAscii, onModel, status }: Prop
         </div>
       </> : tab === "cards" ? <>
         <div className="property-card">
+          <Group title="Scroll camera">
+            <p className="property-help">Scrolling down from the hero first moves the camera from the Camera tab settings to these (linear with scroll). Once it arrives, the first card enters. Scrolling back up retraces it.</p>
+            <Range label="Focal length · mm" value={cards.camFocal} min={15} max={120} step={1} onChange={v => c("camFocal", v)} />
+            <Range label="Orbit" value={cards.camOrbit} min={-180} max={180} step={1} onChange={v => c("camOrbit", v)} />
+            <Range label="Elevation" value={cards.camElevation} min={-60} max={60} step={1} onChange={v => c("camElevation", v)} />
+            <Range label="Shift X" value={cards.camShiftX} min={-1} max={1} onChange={v => c("camShiftX", v)} />
+            <Range label="Shift Y" value={cards.camShiftY} min={-1} max={1} onChange={v => c("camShiftY", v)} />
+          </Group>
           <Group title="Open · nav button">
             <Range label="Duration · ms" value={cards.openMs} min={200} max={3000} step={50} onChange={v => c("openMs", v)} />
             <EaseEditor label="Ease" value={cards.openEase} onChange={v => c("openEase", v)} />

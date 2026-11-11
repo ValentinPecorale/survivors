@@ -14,6 +14,7 @@ import landingKeys from "./camera-landing.json"
 import { projectedBounds, type TigerFrame } from "./camera-framing"
 import { useAsciiHover } from "./ascii-hover"
 import { Tiger } from "./tiger"
+import { getCardSettings, scrollCamera } from "../card-settings"
 import { asciiConfig, columnsFor } from "./ascii-config"
 
 const MODEL_URL = "/models/plants.glb?v=frontplants-20261111"
@@ -48,6 +49,11 @@ function Plants({ settings, orbitTarget, subjectFrame }: { settings: ModelSettin
   }, [scene, cameras])
 
   useLayoutEffect(() => { set({ camera: authored.camera }) }, [authored, set])
+  /** Vertical fov for a focal length, keeping the authored 16:9 framing on wider screens. */
+  const fovFor = (focal: number, aspect: number) => {
+    const baseHalf = Math.atan(Math.tan(THREE.MathUtils.degToRad(authored.fov) / 2) * 85.56 / focal)
+    return THREE.MathUtils.radToDeg(2 * (aspect > AUTHORED_ASPECT ? Math.atan(Math.tan(baseHalf) * AUTHORED_ASPECT / aspect) : baseHalf))
+  }
   useLayoutEffect(() => {
     const { camera, fov } = authored
     const aspect = size.width / size.height
@@ -158,11 +164,20 @@ function Plants({ settings, orbitTarget, subjectFrame }: { settings: ModelSettin
       Math.PI / 2,
       Math.PI / 2 + THREE.MathUtils.degToRad(settings.tigerRotation),
     )
-    cameraOrbit.sphere.theta += THREE.MathUtils.degToRad(settings.orbit + state.x * settings.cursorHorizontal * direction)
-    cameraOrbit.sphere.phi -= THREE.MathUtils.degToRad(settings.elevation + state.y * settings.cursorVertical * direction)
+    // Scrolling blends the Camera tab settings toward the scroll camera target (Cards tab).
+    const blend01 = scrollCamera.progress
+    const target = getCardSettings()
+    const mix = (from: number, to: number) => from + (to - from) * blend01
+    const orbit = mix(settings.orbit, target.camOrbit)
+    const elevation = mix(settings.elevation, target.camElevation)
+    const shiftX = mix(settings.shiftX, target.camShiftX)
+    const shiftY = mix(settings.shiftY, target.camShiftY)
+    cameraOrbit.sphere.theta += THREE.MathUtils.degToRad(orbit + state.x * settings.cursorHorizontal * direction)
+    cameraOrbit.sphere.phi -= THREE.MathUtils.degToRad(elevation + state.y * settings.cursorVertical * direction)
     cameraOrbit.sphere.makeSafe()
     const camera = authored.camera
     camera.up.set(0, 1, 0)
+    camera.fov = fovFor(mix(settings.focalLength, target.camFocal), camera.aspect)
     camera.clearViewOffset()
     let screenBounds: ReturnType<typeof projectedBounds> | null = null
     for (let attempt = 0; attempt < 3; attempt++) {
@@ -183,8 +198,8 @@ function Plants({ settings, orbitTarget, subjectFrame }: { settings: ModelSettin
       // Lens shift centers the fixed framing envelope without chasing animation.
       // Explicit user framing shifts remain deliberate offsets from center.
       camera.setViewOffset(size.width, size.height,
-        (centerX + settings.shiftX) * size.width / 2,
-        -(centerY + settings.shiftY) * size.height / 2,
+        (centerX + shiftX) * size.width / 2,
+        -(centerY + shiftY) * size.height / 2,
         size.width, size.height)
     }
     // Sample the original camera keys at the exact Loop mixer time. Keeping
