@@ -34,7 +34,7 @@ export const HOLD_MS = 2000
 /** While holding, the card only creeps in this far (30% visible) by the time the hold commits. */
 export const HOLD_PEEK = 0.3
 /** After the hold commits, the card finishes 30% to 100% in this long, linear. */
-export const HOLD_FINISH_MS = 500
+export const HOLD_FINISH_MS = 200
 
 /** cubic-bezier(x1, y1, x2, y2) solver, same curve CSS uses. */
 function cubicBezier(x1: number, y1: number, x2: number, y2: number) {
