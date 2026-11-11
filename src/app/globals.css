@@ -139,7 +139,7 @@ body {
 .site-nav ul button kbd::before { content: ""; position: absolute; inset: 0; z-index: -1; border-radius: inherit; background: #fff; transform: scaleX(0); transform-origin: left; }
 .site-nav ul button kbd span { mix-blend-mode: difference; color: #fff; }
 .site-nav ul button kbd[data-fill="true"] { opacity: 1; }
-.site-nav ul button kbd[data-fill="true"]::before { animation: kbd-fill var(--hold-ms, 2000ms) linear forwards; }
+.site-nav ul button kbd[data-fill="true"]::before { animation: kbd-fill var(--hold-ms, 1200ms) linear forwards; }
 @keyframes kbd-fill { to { transform: scaleX(1); } }
 .site-nav ul button[aria-disabled="true"] { pointer-events: none; }
 .site-nav ul button:hover, .site-nav ul button:focus-visible, .site-nav ul button[data-active="true"] { opacity: 1; }
