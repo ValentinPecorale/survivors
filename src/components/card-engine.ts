@@ -31,9 +31,9 @@ const MIN_TWEEN = 0.35
 export const EARLY_UNLOCK_MS = 100
 /** Hold a section key this long to commit: its card then plays out the rest of its slide by itself. */
 export const HOLD_MS = 1200
-/** While holding, the card only creeps in this far (30% visible) by the time the hold commits. */
-export const HOLD_PEEK = 0.3
-/** After the hold commits, the card finishes 30% to 100% in this long, linear. */
+/** While holding, the card only creeps in this far (20% visible) by the time the hold commits. */
+export const HOLD_PEEK = 0.2
+/** After the hold commits, the card finishes 20% to 100% in this long, linear. */
 export const HOLD_FINISH_MS = 200
 
 /** cubic-bezier(x1, y1, x2, y2) solver, same curve CSS uses. */
@@ -67,8 +67,8 @@ function cubicBezier(x1: number, y1: number, x2: number, y2: number) {
 }
 /** Ease-in only (quartic): the card accelerates all the way and stops sharply at full speed, no ease-out. */
 const ease = cubicBezier(0.5, 0, 0.75, 0)
-/** Hold creep over the 1.2s hold: ease-out (quartic). The card moves fastest at the start and settles to rest at its 30% peek. */
-const holdEase = cubicBezier(0.25, 1, 0.5, 1)
+/** Hold creep over the 1.2s hold: strong ease-out (expo). The card moves fastest at the start and settles to rest at its 20% peek. */
+const holdEase = cubicBezier(0.16, 1, 0.3, 1)
 const linear = (t: number) => t
 const clamp01 = (v: number) => Math.min(1, Math.max(0, v))
 
