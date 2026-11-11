@@ -198,6 +198,12 @@ export function PropertiesPanel({ ascii, model, onAscii, onModel, status }: Prop
           <Group title="Creep · 0% to creep value">
             <EaseEditor label="Ease" value={cards.creepEase} onChange={v => c("creepEase", v)} />
           </Group>
+          <Group title="Close · button, Esc, wordmark">
+            <Range label="Duration · ms" value={cards.closeMs} min={200} max={3000} step={50} onChange={v => c("closeMs", v)} />
+            <Range label="Stagger · ms" value={cards.closeStaggerMs} min={0} max={300} step={5} onChange={v => c("closeStaggerMs", v)} />
+            <EaseEditor label="Ease" value={cards.closeEase} onChange={v => c("closeEase", v)} />
+            <p className="property-help">How the stack leaves. The front card goes first and each card below follows after the stagger. A card that is only half open takes proportionally less time.</p>
+          </Group>
           <Group title="Final slide">
             <Range label="Duration · ms" value={cards.finishMs} min={50} max={1500} step={10} onChange={v => c("finishMs", v)} />
             <EaseEditor label="Ease" value={cards.finishEase} onChange={v => c("finishEase", v)} />

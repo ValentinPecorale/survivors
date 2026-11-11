@@ -26,7 +26,6 @@ type Motion = {
 
 /** The card animation: full 0 to 1 slide. */
 export const SLIDE_MS = 1500
-export const STAGGER_MS = 70
 /** Follow time constant for scrubbing: ~90ms glides wheel notches without adding easing. */
 const SMOOTH_MS = 90
 const MIN_TWEEN = 0.35
@@ -208,7 +207,14 @@ export function createCardEngine<Id extends string>(order: readonly Id[], onChan
       if (!open.length) return
       if (reduced()) { motion.clear(); commit([]); return }
       commit(cards.map(c => ({ ...c, closing: true, entering: false })))
-      open.forEach((c, i) => tweenTo(c.key, 0, { delay: (open.length - 1 - i) * STAGGER_MS, onDone: () => remove(c.key) }))
+      const cfg = getCardSettings()
+      const ease = bezierEase(cfg.closeEase)
+      open.forEach((c, i) => tweenTo(c.key, 0, {
+        delay: (open.length - 1 - i) * cfg.closeStaggerMs,
+        ms: cfg.closeMs * Math.max(MIN_TWEEN, motion.get(c.key)?.p ?? 1),
+        ease,
+        onDone: () => remove(c.key),
+      }))
       kick()
     },
 

@@ -21,6 +21,12 @@ export const defaultCardSettings = {
   finishMs: 200,
   /** Easing of the final slide. Default is linear. */
   finishEase: [1 / 3, 1 / 3, 2 / 3, 2 / 3] as Bezier,
+  /** Close (button, Esc, wordmark): time for a fully open card to slide out. Half-open cards take proportionally less. */
+  closeMs: 1500,
+  /** Delay between one card leaving and the next one under it starting to leave. */
+  closeStaggerMs: 70,
+  /** Easing of the close slide. Default is the same quartic ease-in as the open slide. */
+  closeEase: [0.5, 0, 0.75, 0] as Bezier,
 }
 export type CardSettings = typeof defaultCardSettings
 
@@ -71,6 +77,9 @@ export function loadCardSettings() {
       creepEase: isBezier(saved.creepEase) ? saved.creepEase : d.creepEase,
       finishMs: num(saved.finishMs, d.finishMs, 20, 3000),
       finishEase: isBezier(saved.finishEase) ? saved.finishEase : d.finishEase,
+      closeMs: num(saved.closeMs, d.closeMs, 100, 5000),
+      closeStaggerMs: num(saved.closeStaggerMs, d.closeStaggerMs, 0, 1000),
+      closeEase: isBezier(saved.closeEase) ? saved.closeEase : d.closeEase,
     })
   } catch { /* keep defaults */ }
 }
