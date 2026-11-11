@@ -2,7 +2,8 @@
 
 import Link from "next/link"
 import { useEffect, useState } from "react"
-import { createCardEngine, HOLD_MS, SLIDE_MS, type Card } from "./card-engine"
+import { createCardEngine, SLIDE_MS, type Card } from "./card-engine"
+import { loadCardSettings, useCardSettings } from "./card-settings"
 
 /** Each section owns one card. */
 const sections = [
@@ -25,9 +26,9 @@ const SCROLL_TRAVEL = 0.8
  * - Scroll / swipe: scrubbed. Down pulls the next section's card in, up pushes
  *   the front card out; its position follows the gesture linearly, so you
  *   scroll normally until the card is fully visible. See card-engine.ts.
- * - Hold a section's letter ([W] [S] [C]) for 1.2s: the letter fills left to right while the card
- *   creeps in to 20% (expo ease-out); at exactly 1.2s it finishes 20% to 100% in 0.2s, linear.
- *   Release earlier and the card goes back; holding longer does nothing.
+ * - Hold a section's letter ([W] [S] [C]): the letter fills while the card creeps in to the peek;
+ *   at the end of the hold the final slide takes over. Times, peek and both eases live in the
+ *   properties panel (Cards tab). Release earlier and the card goes back.
  * - Close, Esc or the wordmark clears the whole stack, top card first (70ms stagger).
  *
  * A small rAF engine instead of ScrollTrigger: the page has no document scroll
@@ -40,6 +41,8 @@ export function Navbar() {
 
   /** Section whose key is currently held; drives the fill on its [letter]. */
   const [holdId, setHoldId] = useState<SectionId | null>(null)
+  const { holdMs } = useCardSettings()
+  useEffect(() => { loadCardSettings() }, [])
   const locked = cards.some(c => c.entering)
   // Safety net: if the browser never reports animation frames (hidden tab), unlock after the slide should have finished.
   // The clock only runs once no key is held, so a 1s hold plus its slide is never cut short.
@@ -62,7 +65,8 @@ export function Navbar() {
 
   // Hold a section's letter for 1.2s to open its card; see card-engine.ts holdStart/holdEnd.
   useEffect(() => {
-    const editable = (target: EventTarget | null) => target instanceof HTMLElement && (target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName))
+    // Sliders, switches and colour pickers do not swallow letters, so shortcuts keep working after tuning a control.
+    const editable = (target: EventTarget | null) => target instanceof HTMLElement && (target.isContentEditable || /^(TEXTAREA|SELECT)$/.test(target.tagName) || (target instanceof HTMLInputElement && !/^(range|checkbox|radio|color|button)$/.test(target.type)))
     let holding: string | null = null
     const reduced = () => window.matchMedia("(prefers-reduced-motion: reduce)").matches
     const down = (event: KeyboardEvent) => {
@@ -132,7 +136,7 @@ export function Navbar() {
           <ul>
             {sections.map(s => (
               <li key={s.id}>
-                <button type="button" data-active={top?.id === s.id ? "true" : undefined} aria-disabled={locked || undefined} onClick={() => { if (!locked) engine.open(s.id) }}>{s.label}<kbd aria-hidden="true" data-fill={holdId === s.id ? "true" : undefined} style={{ "--hold-ms": `${HOLD_MS}ms` } as React.CSSProperties}><span>[{s.key.toUpperCase()}]</span></kbd></button>
+                <button type="button" data-active={top?.id === s.id ? "true" : undefined} aria-disabled={locked || undefined} onClick={() => { if (!locked) engine.open(s.id) }}>{s.label}<kbd aria-hidden="true" data-fill={holdId === s.id ? "true" : undefined} style={{ "--hold-ms": `${holdMs}ms` } as React.CSSProperties}><span>[{s.key.toUpperCase()}]</span></kbd></button>
               </li>
             ))}
           </ul>

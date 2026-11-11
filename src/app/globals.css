@@ -47,8 +47,8 @@ body {
 .properties-live { margin-left: auto; display: flex; align-items: center; gap: 5px; color: #92928e; font-size: 9px; }
 .properties-live i { width: 4px; height: 4px; background: #c7c9bd; border-radius: 50%; }
 .properties-header > button { font-size: 18px; color: #989898; width: 22px; height: 24px; cursor: pointer; }
-.properties-tabs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); padding: 8px; gap: 4px; border-bottom: 1px solid #ffffff0d; }
-.properties-tabs button { display: flex; align-items: center; justify-content: center; gap: 5px; padding: 9px 8px; border: 1px solid transparent; border-radius: 8px; color: #777; font-size: 11px; font-weight: 650; cursor: pointer; transition: background 160ms ease-out, color 160ms ease-out; }
+.properties-tabs { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); padding: 8px; gap: 2px; border-bottom: 1px solid #ffffff0d; }
+.properties-tabs button { display: flex; align-items: center; justify-content: center; gap: 5px; padding: 9px 2px; border: 1px solid transparent; border-radius: 8px; color: #777; font-size: 10px; font-weight: 650; cursor: pointer; transition: background 160ms ease-out, color 160ms ease-out; }
 .properties-tabs button[aria-selected="true"] { color: #ededeb; background: #242425; border-color: #ffffff09; }
 .properties-tabs button span { font-size: 8px; border: 1px solid #ffffff12; color: #969695; padding: 1px 4px; border-radius: 10px; font-weight: 400; }
 .properties-body { overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: #646465 #19191a; padding: 8px; min-height: 0; }
@@ -176,3 +176,11 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .site-nav { animation: none; }
 }
+
+/* Ease editor (Cards tab): curve preview + handles. */
+.property-ease { padding-bottom: 4px; }
+.ease-preview { display: block; width: 128px; height: 128px; margin: 8px auto 10px; background: #161617; border: 1px solid #ffffff0d; border-radius: 10px; }
+.ease-preview rect { fill: none; stroke: #ffffff1f; stroke-width: 0.6; }
+.ease-preview line { stroke: #6f6f70; stroke-width: 0.8; }
+.ease-preview polyline { fill: none; stroke: #ededeb; stroke-width: 1.8; stroke-linejoin: round; }
+.ease-preview circle { fill: #c7c9bd; }

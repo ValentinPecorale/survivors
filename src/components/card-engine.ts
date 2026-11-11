@@ -10,13 +10,16 @@
  * scroll gesture never triggers a React render per frame.
  */
 
+import { cubicBezier } from "./bezier"
+import { bezierEase, getCardSettings } from "./card-settings"
+
 export type Card<Id extends string = string> = { key: number; id: Id; closing: boolean; entering: boolean }
 
 type Motion = {
   p: number
   target: number | null
   scrubbed: boolean
-  /** Key held down: p creeps toward HOLD_PEEK through holdEase until released or HOLD_MS commits it. */
+  /** Key held down: p creeps toward HOLD_PEEK through the creep ease until released or the hold time commits it. */
   hold: { start: number; replace: number | null } | null
   tween: { from: number; to: number; start: number; delay: number; dur: number; onDone: () => void; onEarly?: () => void; early?: boolean; ease?: (t: number) => number } | null
 }
@@ -29,47 +32,10 @@ const SMOOTH_MS = 90
 const MIN_TWEEN = 0.35
 /** The nav unlocks this long before a slide-in ends, so the next press can start as it lands. */
 export const EARLY_UNLOCK_MS = 100
-/** Hold a section key this long to commit: its card then plays out the rest of its slide by itself. */
-export const HOLD_MS = 1200
-/** While holding, the card only creeps in this far (20% visible) by the time the hold commits. */
-export const HOLD_PEEK = 0.2
-/** After the hold commits, the card finishes 20% to 100% in this long, linear. */
-export const HOLD_FINISH_MS = 200
 
-/** cubic-bezier(x1, y1, x2, y2) solver, same curve CSS uses. */
-function cubicBezier(x1: number, y1: number, x2: number, y2: number) {
-  const cx = 3 * x1, bx = 3 * (x2 - x1) - cx, ax = 1 - cx - bx
-  const cy = 3 * y1, by = 3 * (y2 - y1) - cy, ay = 1 - cy - by
-  const x = (s: number) => ((ax * s + bx) * s + cx) * s
-  const y = (s: number) => ((ay * s + by) * s + cy) * s
-  const dx = (s: number) => (3 * ax * s + 2 * bx) * s + cx
-  return (t: number) => {
-    if (t <= 0 || t >= 1) return t
-    let s = t
-    for (let i = 0; i < 8; i++) {
-      const err = x(s) - t
-      if (Math.abs(err) < 1e-5) return y(s)
-      const slope = dx(s)
-      if (Math.abs(slope) < 1e-6) break
-      s -= err / slope
-    }
-    let lo = 0, hi = 1
-    s = t
-    while (lo < hi) {
-      const err = x(s)
-      if (Math.abs(err - t) < 1e-5) break
-      if (t > err) lo = s; else hi = s
-      s = (hi - lo) / 2 + lo
-      if (hi - lo < 1e-6) break
-    }
-    return y(s)
-  }
-}
 /** Ease-in only (quartic): the card accelerates all the way and stops sharply at full speed, no ease-out. */
 const ease = cubicBezier(0.5, 0, 0.75, 0)
-/** Hold creep over the 1.2s hold: strong ease-out (expo). The card moves fastest at the start and settles to rest at its 20% peek. */
-const holdEase = cubicBezier(0.16, 1, 0.3, 1)
-const linear = (t: number) => t
+/** Hold creep and final-slide curves, durations and peek come live from card-settings.ts (properties panel, Cards tab). */
 const clamp01 = (v: number) => Math.min(1, Math.max(0, v))
 
 export function createCardEngine<Id extends string>(order: readonly Id[], onChange: (cards: Card<Id>[]) => void) {
@@ -107,8 +73,9 @@ export function createCardEngine<Id extends string>(order: readonly Id[], onChan
     for (const [key, m] of [...motion]) {
       const t = m.tween
       if (m.hold) {
-        const raw = clamp01((now - m.hold.start) / HOLD_MS)
-        m.p = HOLD_PEEK * holdEase(raw)
+        const cfg = getCardSettings()
+        const raw = clamp01((now - m.hold.start) / cfg.holdMs)
+        m.p = (cfg.peekPct / 100) * bezierEase(cfg.creepEase)(raw)
         if (raw >= 1) { paint(key); commitHold(key); active = true; continue }
         paint(key)
         active = true
@@ -141,12 +108,12 @@ export function createCardEngine<Id extends string>(order: readonly Id[], onChan
     raf = requestAnimationFrame(frame)
   }
 
-  const tweenTo = (key: number, to: number, opts: { delay?: number; full?: boolean; ms?: number; linear?: boolean; onDone: () => void; onEarly?: () => void }) => {
+  const tweenTo = (key: number, to: number, opts: { delay?: number; full?: boolean; ms?: number; ease?: (t: number) => number; onDone: () => void; onEarly?: () => void }) => {
     const m = motion.get(key)
     if (!m) return
     m.target = null
     m.hold = null
-    m.tween = { from: m.p, to, start: performance.now(), delay: opts.delay ?? 0, dur: opts.ms ?? (opts.full ? SLIDE_MS : SLIDE_MS * Math.max(MIN_TWEEN, Math.abs(to - m.p))), onDone: opts.onDone, onEarly: opts.onEarly, ease: opts.linear ? linear : undefined }
+    m.tween = { from: m.p, to, start: performance.now(), delay: opts.delay ?? 0, dur: opts.ms ?? (opts.full ? SLIDE_MS : SLIDE_MS * Math.max(MIN_TWEEN, Math.abs(to - m.p))), onDone: opts.onDone, onEarly: opts.onEarly, ease: opts.ease }
   }
 
   /** A held card is now fully open: drop the older card of the same section it was lifted from. */
@@ -158,12 +125,12 @@ export function createCardEngine<Id extends string>(order: readonly Id[], onChan
     commit(cards.filter(c => c.key !== replace).map(c => (c.key === key ? { ...c, entering: false } : c)))
   }
 
-  /** The hold reached HOLD_MS: finish the card (linear, HOLD_FINISH_MS). Holding longer changes nothing. */
+  /** The hold reached holdMs: finish the card (finishMs, finishEase). Holding longer changes nothing. */
   const commitHold = (key: number) => {
     const m = motion.get(key)
     if (!m?.hold) return
     const replace = m.hold.replace
-    tweenTo(key, 1, { ms: HOLD_FINISH_MS, linear: true, onDone: () => { m.hold = { start: 0, replace }; finishHold(key) }, onEarly: () => settle(key) })
+    tweenTo(key, 1, { ms: getCardSettings().finishMs, ease: bezierEase(getCardSettings().finishEase), onDone: () => { m.hold = { start: 0, replace }; finishHold(key) }, onEarly: () => settle(key) })
   }
 
   /** Appends a card for `id` at p = 0, dropping any older live card of the same section. */
@@ -208,8 +175,8 @@ export function createCardEngine<Id extends string>(order: readonly Id[], onChan
     },
 
     /**
-     * Key pressed: the section's card starts creeping in (to HOLD_PEEK over
-     * HOLD_MS) and commits if the key is still down at HOLD_MS. If the section already has a card lower in the stack it stays
+     * Key pressed: the section's card starts creeping in (to the peek over
+     * the hold time) and commits if the key is still down at the end. If the section already has a card lower in the stack it stays
      * put until this one commits, so an aborted hold loses nothing.
      */
     holdStart(id: Id) {
@@ -223,12 +190,13 @@ export function createCardEngine<Id extends string>(order: readonly Id[], onChan
       return true
     },
 
-    /** Key released before HOLD_MS: the card goes back to where it started and is removed. */
+    /** Key released before the hold time: the card goes back to where it started and is removed. */
     holdEnd() {
       const held = [...motion].find(([, m]) => m.hold)
       if (!held) return
       const [key, m] = held
-      m.p = HOLD_PEEK * holdEase(clamp01((performance.now() - m.hold!.start) / HOLD_MS))
+      const cfg = getCardSettings()
+      m.p = (cfg.peekPct / 100) * bezierEase(cfg.creepEase)(clamp01((performance.now() - m.hold!.start) / cfg.holdMs))
       paint(key)
       tweenTo(key, 0, { onDone: () => remove(key) })
       kick()

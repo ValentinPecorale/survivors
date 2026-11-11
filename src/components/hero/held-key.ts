@@ -4,7 +4,7 @@ import { useEffect, useState } from "react"
 
 /** Elements where typing is for the user, not for the ASCII glyphs. */
 function isEditable(target: EventTarget | null) {
-  return target instanceof HTMLElement && (target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName))
+  return target instanceof HTMLElement && (target.isContentEditable || /^(TEXTAREA|SELECT)$/.test(target.tagName) || (target instanceof HTMLInputElement && !/^(range|checkbox|radio|color|button)$/.test(target.type)))
 }
 
 /**

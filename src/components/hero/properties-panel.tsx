@@ -2,6 +2,7 @@
 
 import { useId, useState, type CSSProperties, type ReactNode } from "react"
 import { saveDefaultSettings } from "./settings-preset"
+import { bezierEase, defaultCardSettings, easePresets, saveCardSettings, setCardSettings, useCardSettings, type Bezier, type CardSettings } from "../card-settings"
 import { defaultAscii, defaultModel, defaultCamera, type AsciiSettings, type ModelSettings } from "./live-settings"
 
 type Props = {
@@ -43,12 +44,50 @@ function Group({ title, children }: { title: string; children: ReactNode }) {
   return <details className="property-group" open><summary>{title}</summary><div className="property-group-body">{children}</div></details>
 }
 
+const sameBezier = (a: Bezier, b: Bezier) => a.every((v, i) => Math.abs(v - b[i]) < 0.001)
+
+/**
+ * cubic-bezier editor: preset picker, a curve preview (time across, progress up;
+ * the box is 0 to 1 so overshoot stays visible) and the four handles.
+ */
+function EaseEditor({ label, value, onChange }: { label: string; value: Bezier; onChange: (value: Bezier) => void }) {
+  const preset = easePresets.find(([, b]) => sameBezier(b, value))?.[0] ?? "custom"
+  const fn = bezierEase(value)
+  const points = Array.from({ length: 41 }, (_, i) => { const t = i / 40; return `${(t * 100).toFixed(1)},${(75 - fn(t) * 50).toFixed(1)}` }).join(" ")
+  const set = (index: number, v: number) => onChange(value.map((n, i) => (i === index ? v : n)) as Bezier)
+  const handle = (x: number, y: number) => [x * 100, 75 - y * 50] as const
+  const [h1x, h1y] = handle(value[0], value[1])
+  const [h2x, h2y] = handle(value[2], value[3])
+  return <div className="property-ease">
+    <label className="property-row"><span>{label}</span><select aria-label={label} value={preset} onChange={e => {
+      const found = easePresets.find(([name]) => name === e.target.value)
+      if (found) onChange([...found[1]] as Bezier)
+      e.currentTarget.blur() // keep letter shortcuts working after picking
+    }}>
+      {easePresets.map(([name]) => <option key={name} value={name}>{name}</option>)}
+      <option value="custom">Custom</option>
+    </select></label>
+    <svg className="ease-preview" viewBox="0 0 100 100" role="img" aria-label={`${label} curve`}>
+      <rect x="0" y="25" width="100" height="50" />
+      <line x1="0" y1="75" x2={h1x} y2={h1y} /><line x1="100" y1="25" x2={h2x} y2={h2y} />
+      <polyline points={points} />
+      <circle cx={h1x} cy={h1y} r="2" /><circle cx={h2x} cy={h2y} r="2" />
+    </svg>
+    <Range label="Handle 1 · time" value={value[0]} min={0} max={1} onChange={v => set(0, v)} />
+    <Range label="Handle 1 · progress" value={value[1]} min={-0.5} max={1.5} onChange={v => set(1, v)} />
+    <Range label="Handle 2 · time" value={value[2]} min={0} max={1} onChange={v => set(2, v)} />
+    <Range label="Handle 2 · progress" value={value[3]} min={-0.5} max={1.5} onChange={v => set(3, v)} />
+  </div>
+}
+
 const options = (values: string[]) => values.map(value => [value, value.charAt(0).toUpperCase() + value.slice(1)] as [string, string])
 
 export function PropertiesPanel({ ascii, model, onAscii, onModel, status }: Props) {
-  const [tab, setTab] = useState<"ascii" | "model" | "camera">("ascii")
+  const [tab, setTab] = useState<"ascii" | "model" | "camera" | "cards">("ascii")
   const [open, setOpen] = useState(true)
   const [saveStatus, setSaveStatus] = useState("")
+  const cards = useCardSettings()
+  const c = <K extends keyof CardSettings>(key: K, value: CardSettings[K]) => setCardSettings({ ...cards, [key]: value })
   const a = <K extends keyof AsciiSettings>(key: K, value: AsciiSettings[K]) => onAscii({ ...ascii, [key]: value })
   const m = <K extends keyof ModelSettings>(key: K, value: ModelSettings[K]) => onModel({ ...model, [key]: value })
   const ar = (label: string, key: keyof AsciiSettings, min: number, max: number, step = 0.01) => <Range label={label} value={ascii[key] as number} min={min} max={max} step={step} onChange={v => a(key, v)} />
@@ -62,6 +101,7 @@ export function PropertiesPanel({ ascii, model, onAscii, onModel, status }: Prop
       <button id="ascii-tab" role="tab" aria-selected={tab === "ascii"} aria-controls="ascii-properties" onClick={() => setTab("ascii")}>ASCII</button>
       <button id="model-tab" role="tab" aria-selected={tab === "model"} aria-controls="model-properties" onClick={() => setTab("model")}>3D Model</button>
       <button id="camera-tab" role="tab" aria-selected={tab === "camera"} aria-controls="camera-properties" onClick={() => setTab("camera")}>Camera</button>
+      <button id="cards-tab" role="tab" aria-selected={tab === "cards"} aria-controls="cards-properties" onClick={() => setTab("cards")}>Cards</button>
     </div>
     <div className="properties-body" role="tabpanel" id={`${tab}-properties`} aria-labelledby={`${tab}-tab`} key={tab}>
       {status === "no" && <p className="properties-notice" role="status">Showing a static preview. Open this page in a browser with WebGPU enabled for the live scene.</p>}
@@ -148,6 +188,22 @@ export function PropertiesPanel({ ascii, model, onAscii, onModel, status }: Prop
           </Group>
 
         </div>
+      </> : tab === "cards" ? <>
+        <div className="property-card">
+          <Group title="Hold trigger">
+            <Range label="Hold · ms" value={cards.holdMs} min={300} max={3000} step={50} onChange={v => c("holdMs", v)} />
+            <Range label="Creep to · %" value={cards.peekPct} min={5} max={60} step={1} onChange={v => c("peekPct", v)} />
+            <p className="property-help">Hold W, S or C. The letter fills for the hold time while the card creeps in from 0% to the creep value. Release earlier and it goes back.</p>
+          </Group>
+          <Group title="Creep · 0% to creep value">
+            <EaseEditor label="Ease" value={cards.creepEase} onChange={v => c("creepEase", v)} />
+          </Group>
+          <Group title="Final slide">
+            <Range label="Duration · ms" value={cards.finishMs} min={50} max={1500} step={10} onChange={v => c("finishMs", v)} />
+            <EaseEditor label="Ease" value={cards.finishEase} onChange={v => c("finishEase", v)} />
+            <p className="property-help">Plays from the creep value to 100% the moment the hold ends. Press Esc to clear the cards, then hold a letter to test.</p>
+          </Group>
+        </div>
       </> : <>
         <div className="property-card">
           <Group title="Cursor movement">
@@ -175,7 +231,7 @@ export function PropertiesPanel({ ascii, model, onAscii, onModel, status }: Prop
         </div>
       </>}
     </div>
-    <div className="properties-preset"><button onClick={() => setSaveStatus(saveDefaultSettings(ascii, model) ? "Default saved" : "Could not save in this browser")}>Save as default</button><span role="status">{saveStatus}</span></div>
-    <footer className="properties-footer"><span>{status === "checking" ? "Connecting renderer…" : status === "yes" ? "Changes update in real time" : "Static preview"}</span><button onClick={() => tab === "ascii" ? onAscii({ ...defaultAscii }) : tab === "camera" ? onModel({ ...model, ...defaultCamera }) : onModel({ ...defaultModel })}>Reset {tab === "ascii" ? "effect" : tab === "camera" ? "camera" : "model"}</button></footer>
+    <div className="properties-preset"><button onClick={() => setSaveStatus(saveDefaultSettings(ascii, model) && saveCardSettings() ? "Default saved" : "Could not save in this browser")}>Save as default</button><span role="status">{saveStatus}</span></div>
+    <footer className="properties-footer"><span>{status === "checking" ? "Connecting renderer…" : status === "yes" ? "Changes update in real time" : "Static preview"}</span><button onClick={() => tab === "ascii" ? onAscii({ ...defaultAscii }) : tab === "camera" ? onModel({ ...model, ...defaultCamera }) : tab === "cards" ? setCardSettings(defaultCardSettings) : onModel({ ...defaultModel })}>Reset {tab === "ascii" ? "effect" : tab === "camera" ? "camera" : tab === "cards" ? "cards" : "model"}</button></footer>
   </aside>
 }
