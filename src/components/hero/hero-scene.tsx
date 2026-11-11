@@ -16,7 +16,7 @@ import { useAsciiHover } from "./ascii-hover"
 import { Tiger } from "./tiger"
 import { asciiConfig, columnsFor } from "./ascii-config"
 
-const MODEL_URL = "/models/plants.glb?v=dust-20261110"
+const MODEL_URL = "/models/plants.glb?v=frontplants-20261111"
 useGLTF.preload(MODEL_URL)
 
 /** Aspect the shot was framed for in Blender (camera.aspectRatio in the GLB). */
