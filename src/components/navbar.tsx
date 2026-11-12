@@ -4,12 +4,13 @@ import Link from "next/link"
 import { useEffect, useState } from "react"
 import { createCardEngine, type Card } from "./card-engine"
 import { loadCardSettings, useCardSettings } from "./card-settings"
+import { SHORTCUT_KEYS } from "./shortcuts"
 
 /** Each section owns one card. */
 const sections = [
-  { id: "work", label: "Work", key: "w", title: "Selected work", body: "Placeholder copy. Projects, case studies and client names will live here once the portfolio is designed." },
-  { id: "studio", label: "Studio", key: "s", title: "The studio", body: "Placeholder copy. Who we are, how we work and what we believe in." },
-  { id: "contact", label: "Contact", key: "c", title: "Let's talk", body: "Placeholder copy. Email, socials and a short brief form will live here." },
+  { id: "work", label: "Work", key: SHORTCUT_KEYS[0], title: "Selected work", body: "Placeholder copy. Projects, case studies and client names will live here once the portfolio is designed." },
+  { id: "studio", label: "Studio", key: SHORTCUT_KEYS[1], title: "The studio", body: "Placeholder copy. Who we are, how we work and what we believe in." },
+  { id: "contact", label: "Contact", key: SHORTCUT_KEYS[2], title: "Let's talk", body: "Placeholder copy. Email, socials and a short brief form will live here." },
 ] as const
 
 type SectionId = (typeof sections)[number]["id"]
@@ -21,14 +22,12 @@ const SCROLL_TRAVEL = 0.8
  * Centered nav over the hero. Each link owns one full-screen card (three max)
  * stacked over the others.
  *
- * - Nav button: timed slide (duration and ease in the properties panel, Cards tab; default 1.5s
- *   quartic ease-in). Buttons are locked until 100ms before it ends.
+ * - Nav button or letter key ([A] [W] [S]): timed slide, triggered instantly on press. Delay, duration,
+ *   ease and unlock time are in the properties panel (Cards tab; default 1.5s quartic ease-in).
+ *   Buttons are locked until 100ms before it ends.
  * - Scroll / swipe: scrubbed. Down pulls the next section's card in, up pushes
  *   the front card out; its position follows the gesture linearly, so you
  *   scroll normally until the card is fully visible. See card-engine.ts.
- * - Hold a section's letter ([W] [S] [C]): the letter fills while the card creeps in to the peek;
- *   at the end of the hold the final slide takes over. Times, peek and both eases live in the
- *   properties panel (Cards tab). Release earlier and the card goes back.
  * - Close, Esc or the wordmark clears the whole stack, top card first (70ms stagger).
  *
  * A small rAF engine instead of ScrollTrigger: the page has no document scroll
@@ -39,18 +38,15 @@ export function Navbar() {
   const [engine] = useState(() => createCardEngine<SectionId>(sections.map(s => s.id), setCards))
   useEffect(() => () => engine.destroy(), [engine])
 
-  /** Section whose key is currently held; drives the fill on its [letter]. */
-  const [holdId, setHoldId] = useState<SectionId | null>(null)
-  const { holdMs, openMs } = useCardSettings()
+  const { openMs, openDelayMs } = useCardSettings()
   useEffect(() => { loadCardSettings() }, [])
   const locked = cards.some(c => c.entering)
   // Safety net: if the browser never reports animation frames (hidden tab), unlock after the slide should have finished.
-  // The clock only runs once no key is held, so a 1s hold plus its slide is never cut short.
   useEffect(() => {
-    if (!locked || holdId) return
-    const timer = window.setTimeout(() => engine.finishTweens(), openMs + 600)
+    if (!locked) return
+    const timer = window.setTimeout(() => engine.finishTweens(), openDelayMs + openMs + 600)
     return () => window.clearTimeout(timer)
-  }, [locked, holdId, openMs, engine])
+  }, [locked, openMs, openDelayMs, engine])
 
   const live = cards.filter(c => !c.closing)
   const top = live[live.length - 1]
@@ -63,31 +59,17 @@ export function Navbar() {
     return () => window.removeEventListener("keydown", onKey)
   }, [hasCards, engine])
 
-  // Hold a section's letter for 1.2s to open its card; see card-engine.ts holdStart/holdEnd.
+  // Pressing a section's letter opens its card instantly, same slide as the nav button. No hold.
   useEffect(() => {
     // Sliders, switches and colour pickers do not swallow letters, so shortcuts keep working after tuning a control.
     const editable = (target: EventTarget | null) => target instanceof HTMLElement && (target.isContentEditable || /^(TEXTAREA|SELECT)$/.test(target.tagName) || (target instanceof HTMLInputElement && !/^(range|checkbox|radio|color|button)$/.test(target.type)))
-    let holding: string | null = null
-    const reduced = () => window.matchMedia("(prefers-reduced-motion: reduce)").matches
     const down = (event: KeyboardEvent) => {
-      if (event.repeat || holding || event.ctrlKey || event.metaKey || event.altKey || editable(event.target)) return
+      if (event.repeat || event.ctrlKey || event.metaKey || event.altKey || editable(event.target)) return
       const section = sections.find(s => s.key === event.key.toLowerCase())
-      if (!section) return
-      if (reduced()) { engine.open(section.id); return }
-      if (engine.holdStart(section.id)) { holding = section.key; setHoldId(section.id) }
+      if (section) engine.open(section.id)
     }
-    const up = (event: KeyboardEvent) => {
-      if (holding && event.key.toLowerCase() === holding) { holding = null; setHoldId(null); engine.holdEnd() }
-    }
-    const blur = () => { if (holding) { holding = null; setHoldId(null); engine.holdEnd() } }
     window.addEventListener("keydown", down)
-    window.addEventListener("keyup", up)
-    window.addEventListener("blur", blur)
-    return () => {
-      window.removeEventListener("keydown", down)
-      window.removeEventListener("keyup", up)
-      window.removeEventListener("blur", blur)
-    }
+    return () => window.removeEventListener("keydown", down)
   }, [engine])
 
   useEffect(() => {
@@ -136,7 +118,7 @@ export function Navbar() {
           <ul>
             {sections.map(s => (
               <li key={s.id}>
-                <button type="button" data-active={top?.id === s.id ? "true" : undefined} aria-disabled={locked || undefined} onClick={() => { if (!locked) engine.open(s.id) }}>{s.label}<kbd aria-hidden="true" data-fill={holdId === s.id ? "true" : undefined} style={{ "--hold-ms": `${holdMs}ms` } as React.CSSProperties}><span>[{s.key.toUpperCase()}]</span></kbd></button>
+                <button type="button" data-active={top?.id === s.id ? "true" : undefined} aria-disabled={locked || undefined} onClick={() => { if (!locked) engine.open(s.id) }}>{s.label}<kbd aria-hidden="true"><span>[{s.key.toUpperCase()}]</span></kbd></button>
               </li>
             ))}
           </ul>

@@ -6,7 +6,8 @@ import { cubicBezier } from "./bezier"
 export type Bezier = [number, number, number, number]
 
 /**
- * Tunable numbers for the hold-a-letter shortcut. Read live by card-engine.ts,
+ * Tunable numbers for the card open/close transitions (nav button and letter
+ * shortcut share the same open). Read live by card-engine.ts,
  * edited in the properties panel (Cards tab). Not React state: the navbar,
  * the engine and the panel live in different trees.
  */
@@ -27,16 +28,10 @@ export const defaultCardSettings = {
   openMs: 1500,
   /** Easing of the open slide. Default is quartic ease-in: accelerates and stops sharply. */
   openEase: [0.5, 0, 0.75, 0] as Bezier,
-  /** Hold this long to trigger the card. */
-  holdMs: 1200,
-  /** How much of the card is visible by the time the hold ends, in percent. */
-  peekPct: 20,
-  /** Easing of the 0 to peek creep while holding. */
-  creepEase: [0.16, 1, 0.3, 1] as Bezier,
-  /** Duration of the final slide (peek to 100%) after the hold triggers. */
-  finishMs: 200,
-  /** Easing of the final slide. Default is linear. */
-  finishEase: [1 / 3, 1 / 3, 2 / 3, 2 / 3] as Bezier,
+  /** Wait between the trigger (button or letter key) and the slide starting. */
+  openDelayMs: 0,
+  /** The nav unlocks this long before the open slide ends, so the next press can start as it lands. */
+  unlockMs: 100,
   /** Close (button, Esc, wordmark): time for a fully open card to slide out. Half-open cards take proportionally less. */
   closeMs: 1500,
   /** Delay between one card leaving and the next one under it starting to leave. */
@@ -104,11 +99,8 @@ export function loadCardSettings() {
       camCursorVertical: num(saved.camCursorVertical, d.camCursorVertical, 0, 30),
       openMs: num(saved.openMs, d.openMs, 100, 5000),
       openEase: isBezier(saved.openEase) ? saved.openEase : d.openEase,
-      holdMs: num(saved.holdMs, d.holdMs, 100, 5000),
-      peekPct: num(saved.peekPct, d.peekPct, 1, 99),
-      creepEase: isBezier(saved.creepEase) ? saved.creepEase : d.creepEase,
-      finishMs: num(saved.finishMs, d.finishMs, 20, 3000),
-      finishEase: isBezier(saved.finishEase) ? saved.finishEase : d.finishEase,
+      openDelayMs: num(saved.openDelayMs, d.openDelayMs, 0, 1000),
+      unlockMs: num(saved.unlockMs, d.unlockMs, 0, 1000),
       closeMs: num(saved.closeMs, d.closeMs, 100, 5000),
       closeStaggerMs: num(saved.closeStaggerMs, d.closeStaggerMs, 0, 1000),
       closeEase: isBezier(saved.closeEase) ? saved.closeEase : d.closeEase,

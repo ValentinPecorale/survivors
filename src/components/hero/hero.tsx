@@ -38,9 +38,9 @@ export function Hero() {
 
   const liveAscii = { ...defaultAscii, ...ascii, ...(ascii.hoverEnabled === undefined ? { signalWhitePoint: 0.2 } : {}) }
   const liveModel = { ...defaultModel, ...model }
-  // Holding a key re-types the scene in that glyph. A leading space keeps the darkest tones empty so the forms still read.
+  // Holding a key re-types the scene in that glyph and in that key's own colour. A leading space keeps the darkest tones empty so the forms still read.
   const heldKey = useHeldKey()
-  const sceneAscii = heldKey ? { ...liveAscii, charset: "custom", customChars: " " + heldKey, signalWhitePoint: HELD_WHITE_POINT, hoverWhitePoint: Math.min(liveAscii.hoverWhitePoint, HELD_WHITE_POINT) } : liveAscii
+  const sceneAscii = heldKey ? { ...liveAscii, charset: "custom", customChars: " " + heldKey.key, monoColor: heldKey.color, signalWhitePoint: HELD_WHITE_POINT, hoverWhitePoint: Math.min(liveAscii.hoverWhitePoint, HELD_WHITE_POINT) } : liveAscii
 
   return (
     <section className="relative h-svh w-full overflow-hidden bg-black">
