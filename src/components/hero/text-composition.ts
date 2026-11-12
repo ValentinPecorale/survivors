@@ -5,9 +5,9 @@ export const TEXT_ANIMATION_END = 1.7056209882352942
 export const TEXT_COMPOSITION_SIZE = { width: 1920, height: 1080 }
 
 /** The supplied Shader Lab export, with editable values bound to the live panel. */
-export function textComposition(settings: ModelSettings): ShaderLabConfig {
+export function textComposition(settings: ModelSettings, frame = TEXT_COMPOSITION_SIZE): ShaderLabConfig {
   return {
-    composition: TEXT_COMPOSITION_SIZE,
+    composition: frame,
     layers: [
       {
         blendMode: "normal", compositeMode: "filter",

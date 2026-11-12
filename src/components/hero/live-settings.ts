@@ -20,7 +20,7 @@ export const defaultText = {
   textEnabled: true, floorText: "survivors", textFontSize: 308, textColor: "#f5f5f0",
   textX: 0, textZ: 0, textHeight: 0.015, textRotation: 90, textTilt: 0,
   textStartFontSize: 8, textScrollStart: 0, textScrollEnd: 100,
-  textFitViewport: true, textEase: "linear",
+  textEase: "linear",
   textAsciiColumns: 152, textAsciiEndColumns: 152, textAsciiBlackPoint: 0, textAsciiWhitePoint: 0.93,
 }
 

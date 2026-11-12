@@ -11,19 +11,25 @@ import { float, max, select, texture as textureNode, uv, vec2 } from "three/tsl"
 import referenceFrame from "./tiger-framing.json"
 import type { ModelSettings } from "./live-settings"
 import { scrollCamera } from "../card-settings"
-import { textComposition, TEXT_ANIMATION_END, TEXT_COMPOSITION_SIZE } from "./text-composition"
+import { textComposition, TEXT_ANIMATION_END } from "./text-composition"
 
 /** A flat, depth-tested plane showing the exported source/filter composition. */
 export function FloorText({ settings }: { settings: ModelSettings }) {
   const mesh = useRef<THREE.Mesh>(null)
   const renderer = useThree(s => s.gl) as unknown as WebGPURenderer
-  const config = useMemo(() => textComposition(settings), [settings])
-  // Render the supplied source/filter stack at half its logical 1920×1080 size.
+  const size = useThree(s => s.size)
+  const frame = useMemo(() => ({ width: Math.max(1, size.width), height: Math.max(1, size.height) }), [size.width, size.height])
+  const config = useMemo(() => textComposition(settings, frame), [settings, frame])
+  // Match 100vw × 100vh without stretching the filter or allocating a large
+  // desktop render target. Both texture axes share the same resolution scale.
+  const resolutionScale = Math.min(1, 1024 / Math.max(frame.width, frame.height))
+  const renderWidth = Math.max(1, Math.round(frame.width * resolutionScale))
+  const renderHeight = Math.max(1, Math.round(frame.height * resolutionScale))
   const composition = useRef<ShaderLabTextureSource | null>(null)
   const latestConfig = useRef(config)
   useLayoutEffect(() => { latestConfig.current = config }, [config])
   useEffect(() => {
-    const source = new ShaderLabTextureSource(latestConfig.current, { renderer, width: 1024, height: 576 })
+    const source = new ShaderLabTextureSource(latestConfig.current, { renderer, width: renderWidth, height: renderHeight })
     let cancelled = false
     let initialized = false
     // The SDK cannot dispose a source safely while initialize() is pending.
@@ -45,11 +51,11 @@ export function FloorText({ settings }: { settings: ModelSettings }) {
       if (composition.current === source) composition.current = null
       if (initialized) source.dispose()
     }
-  }, [renderer])
+  }, [renderer, renderWidth, renderHeight])
   const material = useMemo(() => new MeshBasicNodeMaterial({
     transparent: true, depthWrite: false, side: THREE.FrontSide, toneMapped: false,
   }), [])
-  const projected = useMemo(() => new THREE.Vector3(), [])
+  const framing = useMemo(() => ({ position: new THREE.Vector3(), parentScale: new THREE.Vector3() }), [])
   // Shader Lab returns a render-target texture, whose Y origin is opposite
   // the plane's UV origin. Flip the sample, not the floor geometry.
   const output = useMemo(() => textureNode(new THREE.Texture(), vec2(uv().x, float(1).sub(uv().y))), [])
@@ -82,10 +88,15 @@ export function FloorText({ settings }: { settings: ModelSettings }) {
     const columns = Math.round(THREE.MathUtils.lerp(settings.textAsciiColumns, settings.textAsciiEndColumns, eased))
     const layer = config.layers[0]
     if (layer.kind === "effect") layer.params.columns = columns
-    // Keep the floor canvas fixed. The exported text-source track animates its
-    // lettering inside that canvas; scaling both would double the animation.
-    const height = TEXT_COMPOSITION_SIZE.height * 0.9 / 308
-    plane.scale.set(height * TEXT_COMPOSITION_SIZE.width / TEXT_COMPOSITION_SIZE.height, height, 1)
+    // A viewport-sized canvas laid on the floor, rather than a billboard.
+    // At the zenith endpoint its width/height cover the full camera viewport;
+    // other camera angles naturally foreshorten the same floor surface.
+    plane.getWorldPosition(framing.position)
+    plane.parent?.getWorldScale(framing.parentScale)
+    const perspective = camera as THREE.PerspectiveCamera
+    const distance = camera.position.distanceTo(framing.position)
+    const height = 2 * distance * Math.tan(THREE.MathUtils.degToRad(perspective.fov / 2)) / perspective.zoom
+    plane.scale.set(height * frame.width / frame.height / framing.parentScale.x, height / framing.parentScale.z, 1)
     plane.updateWorldMatrix(true, false)
     material.opacity = 1
     const source = composition.current
@@ -101,19 +112,6 @@ export function FloorText({ settings }: { settings: ModelSettings }) {
           rendered.current = { config, time, columns }
         }
       }
-    }
-    if (plane.visible && settings.textFitViewport) {
-      // Font size is the requested world size; only shrink when the lettering
-      // would leave the viewport on a narrow screen. Never alter the camera.
-      let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity
-      for (const x of [-0.5, 0.5]) for (const y of [-0.5, 0.5]) {
-        const point = projected.set(x, y, 0).applyMatrix4(plane.matrixWorld).project(camera)
-        minX = Math.min(minX, point.x); maxX = Math.max(maxX, point.x)
-        minY = Math.min(minY, point.y); maxY = Math.max(maxY, point.y)
-      }
-      const fit = Math.min(1, 1.8 / Math.max(maxX - minX, maxY - minY))
-      plane.scale.multiplyScalar(fit)
-      plane.updateWorldMatrix(true, false)
     }
   }, 0.75)
 
