@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useRef, type Dispatch, type SetStateAction } from "react"
-import { defaultAscii, defaultModel, type AsciiSettings, type ModelSettings } from "./live-settings"
+import { defaultAscii, defaultModel, defaultText, type AsciiSettings, type ModelSettings } from "./live-settings"
 
 const STORAGE_KEY = "survivors:default-settings:v2"
 
@@ -36,7 +36,20 @@ function readDefaultSettings(): SavedSettings | null {
     const ascii = mergeSettings(defaultAscii, saved.ascii)
     // Introduce the requested 0.20 resting white point to presets saved before hover existed.
     if (saved.ascii.hoverEnabled === undefined) ascii.signalWhitePoint = 0.2
-    return { ascii, model: mergeSettings(defaultModel, saved.model) }
+    const model = mergeSettings(defaultModel, saved.model)
+    // Older presets had a single fixed column count; preserve that look.
+    if (saved.model.textAsciiEndColumns === undefined) model.textAsciiEndColumns = model.textAsciiColumns
+    // Apply the supplied Shader Lab look once without resetting scene/camera placement.
+    if (saved.model.textPresetVersion !== defaultText.textPresetVersion) {
+      Object.assign(model, {
+        textPresetVersion: defaultText.textPresetVersion, floorText: defaultText.floorText,
+        textFontSize: defaultText.textFontSize, textStartFontSize: defaultText.textStartFontSize,
+        textColor: defaultText.textColor, textEase: defaultText.textEase,
+        textAsciiColumns: defaultText.textAsciiColumns, textAsciiEndColumns: defaultText.textAsciiEndColumns,
+        textAsciiBlackPoint: defaultText.textAsciiBlackPoint, textAsciiWhitePoint: defaultText.textAsciiWhitePoint,
+      })
+    }
+    return { ascii, model }
   } catch { return null }
 }
 

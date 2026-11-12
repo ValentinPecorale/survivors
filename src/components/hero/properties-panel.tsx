@@ -3,7 +3,7 @@
 import { useId, useState, type CSSProperties, type ReactNode } from "react"
 import { saveDefaultSettings } from "./settings-preset"
 import { bezierEase, defaultCardSettings, easePresets, saveCardSettings, setCardSettings, useCardSettings, type Bezier, type CardSettings } from "../card-settings"
-import { defaultAscii, defaultModel, defaultCamera, type AsciiSettings, type ModelSettings } from "./live-settings"
+import { defaultAscii, defaultModel, defaultCamera, defaultText, type AsciiSettings, type ModelSettings } from "./live-settings"
 
 type Props = {
   ascii: AsciiSettings
@@ -83,7 +83,7 @@ function EaseEditor({ label, value, onChange }: { label: string; value: Bezier; 
 const options = (values: string[]) => values.map(value => [value, value.charAt(0).toUpperCase() + value.slice(1)] as [string, string])
 
 export function PropertiesPanel({ ascii, model, onAscii, onModel, status }: Props) {
-  const [tab, setTab] = useState<"ascii" | "model" | "camera" | "cards">("ascii")
+  const [tab, setTab] = useState<"ascii" | "model" | "camera" | "cards" | "text">("ascii")
   const [open, setOpen] = useState(true)
   const [saveStatus, setSaveStatus] = useState("")
   const cards = useCardSettings()
@@ -101,6 +101,7 @@ export function PropertiesPanel({ ascii, model, onAscii, onModel, status }: Prop
       <button id="ascii-tab" role="tab" aria-selected={tab === "ascii"} aria-controls="ascii-properties" onClick={() => setTab("ascii")}>ASCII</button>
       <button id="model-tab" role="tab" aria-selected={tab === "model"} aria-controls="model-properties" onClick={() => setTab("model")}>3D Model</button>
       <button id="camera-tab" role="tab" aria-selected={tab === "camera"} aria-controls="camera-properties" onClick={() => setTab("camera")}>Camera</button>
+      <button id="text-tab" role="tab" aria-selected={tab === "text"} aria-controls="text-properties" onClick={() => setTab("text")}>Text</button>
       <button id="cards-tab" role="tab" aria-selected={tab === "cards"} aria-controls="cards-properties" onClick={() => setTab("cards")}>Cards</button>
     </div>
     <div className="properties-body" role="tabpanel" id={`${tab}-properties`} aria-labelledby={`${tab}-tab`} key={tab}>
@@ -188,13 +189,48 @@ export function PropertiesPanel({ ascii, model, onAscii, onModel, status }: Prop
           </Group>
 
         </div>
+      </> : tab === "text" ? <>
+        <div className="property-card">
+          <Group title="Floor text">
+            <Toggle label="Show floor text" value={model.textEnabled} onChange={v => m("textEnabled", v)} />
+            <label className="property-custom">Text<input aria-label="Floor text" value={model.floorText} maxLength={80} placeholder="Your text" onChange={e => m("floorText", e.target.value)} /></label>
+            <div className="property-row"><span>Effect</span><span className="property-value">ASCII</span></div>
+            <div className="property-row"><span>Opacity</span><span className="property-value">100%</span></div>
+            <Color label="Text color" value={model.textColor} onChange={v => m("textColor", v)} />
+          </Group>
+          <Group title="Text ASCII">
+            {mr("Start text columns", "textAsciiColumns", 40, 400, 1)}
+            {mr("End text columns", "textAsciiEndColumns", 40, 400, 1)}
+            <Range label="Text white point" value={model.textAsciiWhitePoint} min={0.01} max={1} onChange={v => onModel({ ...model, textAsciiWhitePoint: v, textAsciiBlackPoint: Math.min(v - 0.01, model.textAsciiBlackPoint) })} />
+            <Range label="Text black point" value={model.textAsciiBlackPoint} min={0} max={0.99} onChange={v => onModel({ ...model, textAsciiBlackPoint: v, textAsciiWhitePoint: Math.max(v + 0.01, model.textAsciiWhitePoint) })} />
+            <p className="property-help">Columns follow the scroll range and easing below. Set equal counts for a fixed grid. White and black points affect only the floor text.</p>
+          </Group>
+          <Group title="Perspective">
+            {mr("Floor position · X", "textX", -8, 8, 0.1)}
+            {mr("Floor position · Z", "textZ", -8, 8, 0.1)}
+            {mr("Floor height", "textHeight", -0.1, 0.3, 0.005)}
+            {mr("Text rotation · °", "textRotation", -180, 180, 1)}
+            {mr("Text tilt · °", "textTilt", -30, 30, 1)}
+            <p className="property-help">Flat on the floor at 0° tilt. Follows the environment transform; the tiger and trees occlude it naturally.</p>
+          </Group>
+          <Group title="Scroll size and columns">
+            {mr("Start font size · px", "textStartFontSize", 4, 600, 1)}
+            {mr("End font size · px", "textFontSize", 4, 600, 1)}
+            <Range label="Starts · scroll %" value={model.textScrollStart} min={0} max={99} step={1} onChange={v => onModel({ ...model, textScrollStart: v, textScrollEnd: Math.max(v + 1, model.textScrollEnd) })} />
+            <Range label="Ends · scroll %" value={model.textScrollEnd} min={1} max={100} step={1} onChange={v => onModel({ ...model, textScrollEnd: v, textScrollStart: Math.min(v - 1, model.textScrollStart) })} />
+            <Select label="Scroll ease" value={model.textEase} options={[["smooth", "Smoothstep"], ["linear", "Linear"], ["cubic", "Ease out · cubic"]]} onChange={v => m("textEase", v)} />
+            <Toggle label="Fit text to viewport" value={model.textFitViewport} onChange={v => m("textFitViewport", v)} />
+            <p className="property-help">Size follows the camera scroll and reverses when scrolling up. Opacity stays at 100%; the side view is naturally edge-on. Fit caps large sizes on narrow screens.</p>
+          </Group>
+        </div>
       </> : tab === "cards" ? <>
         <div className="property-card">
           <Group title="Scroll camera">
             <p className="property-help">Scrolling down from the hero first moves the camera from the Camera tab settings to these (linear with scroll). Once it arrives, the first card enters. Scrolling back up retraces it.</p>
             <Range label="Focal length · mm" value={cards.camFocal} min={15} max={120} step={1} onChange={v => c("camFocal", v)} />
             <Range label="Orbit" value={cards.camOrbit} min={-180} max={180} step={1} onChange={v => c("camOrbit", v)} />
-            <Range label="Elevation" value={cards.camElevation} min={-60} max={60} step={1} onChange={v => c("camElevation", v)} />
+            <Range label="Elevation" value={cards.camElevation} min={-60} max={90} step={1} onChange={v => c("camElevation", v)} />
+            <p className="property-help">90° is exactly top-down. Cursor orbit and landing motion fade out as the camera arrives.</p>
             <Range label="Shift X" value={cards.camShiftX} min={-1} max={1} onChange={v => c("camShiftX", v)} />
             <Range label="Shift Y" value={cards.camShiftY} min={-1} max={1} onChange={v => c("camShiftY", v)} />
             <Range label="Cursor orbit · horizontal °" value={cards.camCursorHorizontal} min={0} max={30} step={0.1} onChange={v => c("camCursorHorizontal", v)} />
@@ -242,6 +278,6 @@ export function PropertiesPanel({ ascii, model, onAscii, onModel, status }: Prop
       </>}
     </div>
     <div className="properties-preset"><button onClick={() => setSaveStatus(saveDefaultSettings(ascii, model) && saveCardSettings() ? "Default saved" : "Could not save in this browser")}>Save as default</button><span role="status">{saveStatus}</span></div>
-    <footer className="properties-footer"><span>{status === "checking" ? "Connecting renderer…" : status === "yes" ? "Changes update in real time" : "Static preview"}</span><button onClick={() => tab === "ascii" ? onAscii({ ...defaultAscii }) : tab === "camera" ? onModel({ ...model, ...defaultCamera }) : tab === "cards" ? setCardSettings(defaultCardSettings) : onModel({ ...defaultModel })}>Reset {tab === "ascii" ? "effect" : tab === "camera" ? "camera" : tab === "cards" ? "cards" : "model"}</button></footer>
+    <footer className="properties-footer"><span>{status === "checking" ? "Connecting renderer…" : status === "yes" ? "Changes update in real time" : "Static preview"}</span><button onClick={() => tab === "ascii" ? onAscii({ ...defaultAscii }) : tab === "camera" ? onModel({ ...model, ...defaultCamera }) : tab === "cards" ? setCardSettings(defaultCardSettings) : tab === "text" ? onModel({ ...model, ...defaultText }) : onModel({ ...defaultModel })}>Reset {tab === "ascii" ? "effect" : tab === "camera" ? "camera" : tab === "cards" ? "cards" : tab === "text" ? "text" : "model"}</button></footer>
   </aside>
 }

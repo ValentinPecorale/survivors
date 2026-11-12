@@ -16,6 +16,7 @@ import { useAsciiHover } from "./ascii-hover"
 import { Tiger } from "./tiger"
 import { getCardSettings, scrollCamera } from "../card-settings"
 import { asciiConfig, columnsFor } from "./ascii-config"
+import { FloorText } from "./floor-text"
 
 const MODEL_URL = "/models/plants.glb?v=frontplants-20261111"
 useGLTF.preload(MODEL_URL)
@@ -177,9 +178,15 @@ function Plants({ settings, orbitTarget, subjectFrame }: { settings: ModelSettin
     const cursorV = mix(settings.cursorVertical, target.camCursorVertical)
     cameraOrbit.sphere.theta += THREE.MathUtils.degToRad(orbit + state.x * cursorH * direction)
     cameraOrbit.sphere.phi -= THREE.MathUtils.degToRad(elevation + state.y * cursorV * direction)
-    cameraOrbit.sphere.makeSafe()
+    cameraOrbit.sphere.phi = THREE.MathUtils.clamp(cameraOrbit.sphere.phi, 0, Math.PI)
     const camera = authored.camera
-    camera.up.set(0, 1, 0)
+    // Parallel-transport the screen up along the orbit. World Y becomes
+    // parallel to the view at the pole and would make lookAt flip there.
+    camera.up.set(
+      -Math.sin(cameraOrbit.sphere.theta) * Math.cos(cameraOrbit.sphere.phi),
+      Math.sin(cameraOrbit.sphere.phi),
+      -Math.cos(cameraOrbit.sphere.theta) * Math.cos(cameraOrbit.sphere.phi),
+    )
     camera.fov = fovFor(mix(settings.focalLength, target.camFocal), camera.aspect)
     camera.clearViewOffset()
     let screenBounds: ReturnType<typeof projectedBounds> | null = null
@@ -212,7 +219,7 @@ function Plants({ settings, orbitTarget, subjectFrame }: { settings: ModelSettin
       const time = clip?.time ?? 0
       const phase = settings.repeat === "pingpong" && Math.abs(landingLoops.current) % 2 === 1 ? landingKeys.duration - time : time
       const heightOffset = landing.evaluate(phase)[0]
-      camera.position.y += heightOffset * settings.landingStrength
+      camera.position.y += heightOffset * settings.landingStrength * (1 - blend01)
       camera.updateMatrixWorld(true)
     }
     spin.current += THREE.MathUtils.degToRad(settings.spin) * delta
@@ -221,6 +228,7 @@ function Plants({ settings, orbitTarget, subjectFrame }: { settings: ModelSettin
   return <group ref={root} position={[settings.positionX, settings.positionY, settings.positionZ]}
     rotation={[THREE.MathUtils.degToRad(settings.rotationX), THREE.MathUtils.degToRad(settings.rotationY), THREE.MathUtils.degToRad(settings.rotationZ)]} scale={settings.scale}>
     <primitive object={scene} />
+    <FloorText settings={settings} />
   </group>
 }
 
