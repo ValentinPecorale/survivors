@@ -19,22 +19,18 @@ type Motion = {
   p: number
   target: number | null
   scrubbed: boolean
-  /** Key held down: p creeps toward HOLD_PEEK through the creep ease until released or the hold time commits it. */
-  hold: { start: number; replace: number | null } | null
   tween: { from: number; to: number; start: number; delay: number; dur: number; onDone: () => void; onEarly?: () => void; early?: boolean; ease?: (t: number) => number } | null
 }
 
-/** Base duration for partial slides (a released hold retreating). Opening a card uses openMs from card-settings.ts. */
+/** Base duration for partial slides (scrub retreats). Opening a card uses openMs from card-settings.ts. */
 export const SLIDE_MS = 1500
 /** Follow time constant for scrubbing: ~90ms glides wheel notches without adding easing. */
 const SMOOTH_MS = 90
 const MIN_TWEEN = 0.35
-/** The nav unlocks this long before a slide-in ends, so the next press can start as it lands. */
-export const EARLY_UNLOCK_MS = 100
 
 /** Ease-in only (quartic): the card accelerates all the way and stops sharply at full speed, no ease-out. */
 const ease = cubicBezier(0.5, 0, 0.75, 0)
-/** Hold creep and final-slide curves, durations and peek come live from card-settings.ts (properties panel, Cards tab). */
+/** Open and close durations, delays and curves come live from card-settings.ts (properties panel, Cards tab). */
 const clamp01 = (v: number) => Math.min(1, Math.max(0, v))
 
 export function createCardEngine<Id extends string>(order: readonly Id[], onChange: (cards: Card<Id>[]) => void) {
@@ -49,10 +45,10 @@ export function createCardEngine<Id extends string>(order: readonly Id[], onChan
   const commit = (next: Card<Id>[]) => { cards = next; onChange(next) }
   const live = () => cards.filter(c => !c.closing)
   const front = () => live().at(-1)
-  const unlocking = (t: NonNullable<Motion["tween"]>, now: number) => !!t.onEarly && now >= t.start + t.delay + t.dur - EARLY_UNLOCK_MS
+  const unlocking = (t: NonNullable<Motion["tween"]>, now: number) => !!t.onEarly && now >= t.start + t.delay + t.dur - getCardSettings().unlockMs
   /** Scroll camera phase that runs before the first card. */
   const cam: { p: number; target: number | null; tween: { from: number; start: number; delay: number; dur: number; ease: (t: number) => number } | null } = { p: 0, target: null, tween: null }
-  const busy = () => { const now = performance.now(); return [...motion.values()].some(m => m.hold || (m.tween && !unlocking(m.tween, now))) }
+  const busy = () => { const now = performance.now(); return [...motion.values()].some(m => (m.tween && !unlocking(m.tween, now))) }
 
   const paint = (key: number) => {
     const el = els.get(key)
@@ -73,15 +69,7 @@ export function createCardEngine<Id extends string>(order: readonly Id[], onChan
     let active = false
     for (const [key, m] of [...motion]) {
       const t = m.tween
-      if (m.hold) {
-        const cfg = getCardSettings()
-        const raw = clamp01((now - m.hold.start) / cfg.holdMs)
-        m.p = (cfg.peekPct / 100) * bezierEase(cfg.creepEase)(raw)
-        if (raw >= 1) { paint(key); commitHold(key); active = true; continue }
-        paint(key)
-        active = true
-        continue
-      } else if (t) {
+      if (t) {
         const u = (now - t.start - t.delay) / t.dur
         if (u < 0) { active = true; continue }
         if (!t.early && unlocking(t, now)) { t.early = true; t.onEarly?.() }
@@ -121,25 +109,7 @@ export function createCardEngine<Id extends string>(order: readonly Id[], onChan
     const m = motion.get(key)
     if (!m) return
     m.target = null
-    m.hold = null
-    m.tween = { from: m.p, to, start: performance.now(), delay: opts.delay ?? 0, dur: opts.ms ?? (opts.full ? getCardSettings().openMs : SLIDE_MS * Math.max(MIN_TWEEN, Math.abs(to - m.p))), onDone: opts.onDone, onEarly: opts.onEarly, ease: opts.ease ?? (opts.full ? bezierEase(getCardSettings().openEase) : undefined) }
-  }
-
-  /** A held card is now fully open: drop the older card of the same section it was lifted from. */
-  const finishHold = (key: number) => {
-    const m = motion.get(key)
-    const replace = m?.hold?.replace ?? null
-    if (m) { m.hold = null; m.p = 1 }
-    if (replace !== null) motion.delete(replace)
-    commit(cards.filter(c => c.key !== replace).map(c => (c.key === key ? { ...c, entering: false } : c)))
-  }
-
-  /** The hold reached holdMs: finish the card (finishMs, finishEase). Holding longer changes nothing. */
-  const commitHold = (key: number) => {
-    const m = motion.get(key)
-    if (!m?.hold) return
-    const replace = m.hold.replace
-    tweenTo(key, 1, { ms: getCardSettings().finishMs, ease: bezierEase(getCardSettings().finishEase), onDone: () => { m.hold = { start: 0, replace }; finishHold(key) }, onEarly: () => settle(key) })
+    m.tween = { from: m.p, to, start: performance.now(), delay: opts.delay ?? (opts.full ? getCardSettings().openDelayMs : 0), dur: opts.ms ?? (opts.full ? getCardSettings().openMs : SLIDE_MS * Math.max(MIN_TWEEN, Math.abs(to - m.p))), onDone: opts.onDone, onEarly: opts.onEarly, ease: opts.ease ?? (opts.full ? bezierEase(getCardSettings().openEase) : undefined) }
   }
 
   /** Appends a card for `id` at p = 0, dropping any older live card of the same section. */
@@ -147,7 +117,7 @@ export function createCardEngine<Id extends string>(order: readonly Id[], onChan
     const key = nextKey++
     const previous = cards.find(c => !c.closing && c.id === id)
     if (previous) motion.delete(previous.key)
-    motion.set(key, { p: 0, target: null, scrubbed: false, hold: null, tween: null })
+    motion.set(key, { p: 0, target: null, scrubbed: false, tween: null })
     return { key, next: [...cards.filter(c => c.closing || c.id !== id), { key, id, closing: false, entering: false } as Card<Id>] }
   }
 
@@ -157,7 +127,7 @@ export function createCardEngine<Id extends string>(order: readonly Id[], onChan
       if (el) { els.set(key, el); paint(key) } else els.delete(key)
     },
 
-    /** Nav button: slide the section's card in over the stack (or finish a half-scrubbed one). */
+    /** Nav button or letter key: slide the section's card in over the stack (or finish a half-scrubbed one). */
     open(id: Id) {
       if (busy() || cards.some(c => c.closing)) return
       const top = front()
@@ -180,34 +150,6 @@ export function createCardEngine<Id extends string>(order: readonly Id[], onChan
       if (reduced()) { motion.get(key)!.p = 1; commit(next); return }
       commit(next.map(c => (c.key === key ? { ...c, entering: true } : c)))
       tweenTo(key, 1, { full: true, onDone: () => settle(key), onEarly: () => settle(key) })
-      kick()
-    },
-
-    /**
-     * Key pressed: the section's card starts creeping in (to the peek over
-     * the hold time) and commits if the key is still down at the end. If the section already has a card lower in the stack it stays
-     * put until this one commits, so an aborted hold loses nothing.
-     */
-    holdStart(id: Id) {
-      if (busy() || cards.some(c => c.closing)) return false
-      if (front()?.id === id) return false
-      const key = nextKey++
-      const replace = live().find(c => c.id === id)?.key ?? null
-      motion.set(key, { p: 0, target: null, scrubbed: false, hold: { start: performance.now(), replace }, tween: null })
-      commit([...cards, { key, id, closing: false, entering: true } as Card<Id>])
-      kick()
-      return true
-    },
-
-    /** Key released before the hold time: the card goes back to where it started and is removed. */
-    holdEnd() {
-      const held = [...motion].find(([, m]) => m.hold)
-      if (!held) return
-      const [key, m] = held
-      const cfg = getCardSettings()
-      m.p = (cfg.peekPct / 100) * bezierEase(cfg.creepEase)(clamp01((performance.now() - m.hold!.start) / cfg.holdMs))
-      paint(key)
-      tweenTo(key, 0, { onDone: () => remove(key) })
       kick()
     },
 

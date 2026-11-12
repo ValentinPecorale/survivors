@@ -200,29 +200,18 @@ export function PropertiesPanel({ ascii, model, onAscii, onModel, status }: Prop
             <Range label="Cursor orbit · horizontal °" value={cards.camCursorHorizontal} min={0} max={30} step={0.1} onChange={v => c("camCursorHorizontal", v)} />
             <Range label="Cursor orbit · vertical °" value={cards.camCursorVertical} min={0} max={30} step={0.1} onChange={v => c("camCursorVertical", v)} />
           </Group>
-          <Group title="Open · nav button">
-            <Range label="Duration · ms" value={cards.openMs} min={200} max={3000} step={50} onChange={v => c("openMs", v)} />
+          <Group title="Open · button or letter key">
+            <Range label="Delay · ms" value={cards.openDelayMs} min={0} max={1000} step={10} onChange={v => c("openDelayMs", v)} />
+            <Range label="Duration · ms" value={cards.openMs} min={100} max={3000} step={50} onChange={v => c("openMs", v)} />
             <EaseEditor label="Ease" value={cards.openEase} onChange={v => c("openEase", v)} />
-            <p className="property-help">The slide when you click Work, Studio or Contact. Buttons unlock 100ms before it ends.</p>
-          </Group>
-          <Group title="Hold trigger">
-            <Range label="Hold · ms" value={cards.holdMs} min={300} max={3000} step={50} onChange={v => c("holdMs", v)} />
-            <Range label="Creep to · %" value={cards.peekPct} min={5} max={60} step={1} onChange={v => c("peekPct", v)} />
-            <p className="property-help">Hold W, S or C. The letter fills for the hold time while the card creeps in from 0% to the creep value. Release earlier and it goes back.</p>
-          </Group>
-          <Group title="Creep · 0% to creep value">
-            <EaseEditor label="Ease" value={cards.creepEase} onChange={v => c("creepEase", v)} />
+            <Range label="Unlock before end · ms" value={cards.unlockMs} min={0} max={1000} step={10} onChange={v => c("unlockMs", v)} />
+            <p className="property-help">The slide when you click Work, Studio or Contact, or press A, W or S. Delay is the wait between the trigger and the slide starting. Unlock is how long before the slide lands that the next press is accepted.</p>
           </Group>
           <Group title="Close · button, Esc, wordmark">
             <Range label="Duration · ms" value={cards.closeMs} min={200} max={3000} step={50} onChange={v => c("closeMs", v)} />
             <Range label="Stagger · ms" value={cards.closeStaggerMs} min={0} max={300} step={5} onChange={v => c("closeStaggerMs", v)} />
             <EaseEditor label="Ease" value={cards.closeEase} onChange={v => c("closeEase", v)} />
             <p className="property-help">How the stack leaves. The front card goes first and each card below follows after the stagger. A card that is only half open takes proportionally less time.</p>
-          </Group>
-          <Group title="Final slide">
-            <Range label="Duration · ms" value={cards.finishMs} min={50} max={1500} step={10} onChange={v => c("finishMs", v)} />
-            <EaseEditor label="Ease" value={cards.finishEase} onChange={v => c("finishEase", v)} />
-            <p className="property-help">Plays from the creep value to 100% the moment the hold ends. Press Esc to clear the cards, then hold a letter to test.</p>
           </Group>
         </div>
       </> : <>
