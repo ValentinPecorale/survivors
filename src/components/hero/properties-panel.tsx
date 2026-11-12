@@ -196,6 +196,7 @@ export function PropertiesPanel({ ascii, model, onAscii, onModel, status }: Prop
             <label className="property-custom">Text<input aria-label="Floor text" value={model.floorText} maxLength={80} placeholder="Your text" onChange={e => m("floorText", e.target.value)} /></label>
             <div className="property-row"><span>Effect</span><span className="property-value">ASCII</span></div>
             <div className="property-row"><span>Opacity</span><span className="property-value">100%</span></div>
+            <div className="property-row"><span>Frame</span><span className="property-value">100vw × 100vh</span></div>
             <Color label="Text color" value={model.textColor} onChange={v => m("textColor", v)} />
           </Group>
           <Group title="Text ASCII">
@@ -219,8 +220,7 @@ export function PropertiesPanel({ ascii, model, onAscii, onModel, status }: Prop
             <Range label="Starts · scroll %" value={model.textScrollStart} min={0} max={99} step={1} onChange={v => onModel({ ...model, textScrollStart: v, textScrollEnd: Math.max(v + 1, model.textScrollEnd) })} />
             <Range label="Ends · scroll %" value={model.textScrollEnd} min={1} max={100} step={1} onChange={v => onModel({ ...model, textScrollEnd: v, textScrollStart: Math.min(v - 1, model.textScrollStart) })} />
             <Select label="Scroll ease" value={model.textEase} options={[["smooth", "Smoothstep"], ["linear", "Linear"], ["cubic", "Ease out · cubic"]]} onChange={v => m("textEase", v)} />
-            <Toggle label="Fit text to viewport" value={model.textFitViewport} onChange={v => m("textFitViewport", v)} />
-            <p className="property-help">Size follows the camera scroll and reverses when scrolling up. Opacity stays at 100%; the side view is naturally edge-on. Fit caps large sizes on narrow screens.</p>
+            <p className="property-help">Size follows the camera scroll and reverses when scrolling up. The frame follows the full viewport; font sizes are pixels within that frame. Opacity stays at 100%; the side view is naturally edge-on.</p>
           </Group>
         </div>
       </> : tab === "cards" ? <>
