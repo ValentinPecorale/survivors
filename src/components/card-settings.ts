@@ -18,7 +18,7 @@ export const defaultCardSettings = {
    */
   camFocal: 37,
   camOrbit: 0,
-  camElevation: 60,
+  camElevation: 90,
   camShiftX: 0,
   camShiftY: 0,
   /** Cursor orbit (degrees, Camera tab: Horizontal / Vertical orbit) once the scroll camera has arrived. 0 = the view holds still. */
@@ -52,7 +52,8 @@ export const easePresets: [string, Bezier][] = [
   ["Ease in-out · expo", [0.87, 0, 0.13, 1]],
 ]
 
-const STORAGE_KEY = "survivors:card-settings:v1"
+const STORAGE_KEY = "survivors:card-settings:v2"
+const LEGACY_STORAGE_KEY = "survivors:card-settings:v1"
 const easeCache = new Map<string, (t: number) => number>()
 
 /** Cached easing function for a bezier. */
@@ -85,14 +86,16 @@ const num = (v: unknown, fallback: number, min: number, max: number) => typeof v
 /** Restore the saved preset, if any. Called once on the client. */
 export function loadCardSettings() {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY)
+    const currentPreset = localStorage.getItem(STORAGE_KEY)
+    const raw = currentPreset ?? localStorage.getItem(LEGACY_STORAGE_KEY)
     if (!raw) return
     const saved = JSON.parse(raw) as Partial<Record<keyof CardSettings, unknown>>
     const d = defaultCardSettings
     setCardSettings({
       camFocal: num(saved.camFocal, d.camFocal, 15, 120),
       camOrbit: num(saved.camOrbit, d.camOrbit, -180, 180),
-      camElevation: num(saved.camElevation, d.camElevation, -60, 60),
+      // Keep the other saved controls while upgrading the old oblique endpoint.
+      camElevation: currentPreset ? num(saved.camElevation, d.camElevation, -60, 90) : d.camElevation,
       camShiftX: num(saved.camShiftX, d.camShiftX, -1, 1),
       camShiftY: num(saved.camShiftY, d.camShiftY, -1, 1),
       camCursorHorizontal: num(saved.camCursorHorizontal, d.camCursorHorizontal, 0, 30),
