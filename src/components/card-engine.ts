@@ -33,13 +33,14 @@ const ease = cubicBezier(0.5, 0, 0.75, 0)
 /** Open and close durations, delays and curves come live from card-settings.ts (properties panel, Cards tab). */
 const clamp01 = (v: number) => Math.min(1, Math.max(0, v))
 
-export function createCardEngine<Id extends string>(order: readonly Id[], onChange: (cards: Card<Id>[]) => void) {
-  let cards: Card<Id>[] = []
-  let nextKey = 0
+export function createCardEngine<Id extends string>(order: readonly Id[], onChange: (cards: Card<Id>[]) => void, initialId?: Id) {
+  let cards: Card<Id>[] = initialId ? [{ key: 0, id: initialId, closing: false, entering: false }] : []
+  let nextKey = initialId ? 1 : 0
   let raf = 0
   let last = 0
   const motion = new Map<number, Motion>()
   const els = new Map<number, HTMLElement>()
+  if (initialId) motion.set(0, { p: 1, target: null, scrubbed: false, tween: null })
 
   const reduced = () => window.matchMedia("(prefers-reduced-motion: reduce)").matches
   const commit = (next: Card<Id>[]) => { cards = next; onChange(next) }
@@ -122,6 +123,39 @@ export function createCardEngine<Id extends string>(order: readonly Id[], onChan
   }
 
   return {
+    subscribe(listener: (next: Card<Id>[]) => void) {
+      onChange = listener
+      return () => { onChange = () => {} }
+    },
+    /** Direct loads are already settled; no hero flash before hydration. */
+    snapshot() { return cards },
+
+    /** History navigation can interrupt a slide and reveal an earlier card. */
+    navigate(id?: Id) {
+      // Settle interrupted cards without firing callbacks for an obsolete URL.
+      for (const card of cards) {
+        const m = motion.get(card.key)
+        if (m) { m.p = card.closing ? 0 : 1; m.target = null; m.tween = null; paint(card.key) }
+        if (card.closing) motion.delete(card.key)
+      }
+      cards = cards.filter(c => !c.closing).map(c => ({ ...c, entering: false }))
+      if (!id) { if (!cards.length) commit([]); this.closeAll(); return }
+      const index = cards.findIndex(c => c.id === id)
+      if (index < 0) { this.open(id); return }
+      const outgoing = cards.slice(index + 1)
+      if (reduced()) {
+        outgoing.forEach(c => motion.delete(c.key))
+        commit(cards.slice(0, index + 1))
+        return
+      }
+      commit(cards.map((c, i) => ({ ...c, closing: i > index })))
+      const cfg = getCardSettings()
+      outgoing.forEach((c, i) => tweenTo(c.key, 0, {
+        delay: (outgoing.length - 1 - i) * cfg.closeStaggerMs,
+        ms: cfg.closeMs, ease: bezierEase(cfg.closeEase), onDone: () => remove(c.key),
+      }))
+      kick()
+    },
     /** Ref callback target: registers a card element and paints its current position. */
     register(key: number, el: HTMLElement | null) {
       if (el) { els.set(key, el); paint(key) } else els.delete(key)

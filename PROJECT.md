@@ -1,6 +1,6 @@
 # Survivors — project context
 
-Updated: 2026-11-12.
+Updated: 2026-11-13.
 
 ## Purpose and direction
 
@@ -17,7 +17,17 @@ Target: awwwards-level visual craft, interaction, motion and performance. Specif
 
 Only the hero section has been built. The homepage currently renders that hero. The rest of the website, including its structure, content and portfolio presentation, remains to be designed.
 
+About, Services and Work now have real App Router pages at `/about`, `/services` and `/work`, with placeholder content and individual page titles. The `(site)` layout keeps the hero canvas and navbar/card controller mounted between routes. Direct loads show the requested card immediately; internal navigation preserves the configured slides (default 1500ms), easing and 70ms close stagger. Clicks, A/W/S/D shortcuts and scroll/swipe update the URL; browser back/forward reconciles the retained card stack. Contact remains an inert placeholder button with a SPACE badge, with no route or section. Shared section content lives in `src/components/sections.tsx` so outgoing cards can remain visible while the next route loads.
+
 The properties panel is the current tool for tuning the hero. Its eventual visibility on the public website has not been decided.
+
+## Section opening frames and CMS
+
+Each section starts with the shared `SectionContent` opening frame: a bottom-aligned heading (Geist bold 47px/40px), 32px gap and padding, and one grey text field flowing into two desktop columns (Geist semibold 26px, automatic line height, 16px column gap). Below 700px the text stacks in one column. About uses the supplied Figma copy; Services and Work retain placeholder copy until written.
+
+Run `npm run dev -- --port 3001`, then visit `http://localhost:3001/keystatic` to edit. Keystatic has three singleton entries (About, Services, Work), each with exactly two required fields: **Heading** and **Text**. Content is stored in `src/content/sections/*.json`; both route pages and retained animation cards import the same content, so there is no separate transition copy to maintain. Save updates the local checkout; publish content through the normal commit/deploy workflow. Contact has no CMS entry.
+
+The CMS currently uses local storage. Its editor and write API return 404 in production because Vercel does not provide a persistent writable project checkout. Deployed browser editing requires configuring Keystatic GitHub mode and its GitHub App credentials; this connection has not been created. The public website serves bundled content without loading the CMS editor.
 
 ## Hero concept and implementation
 

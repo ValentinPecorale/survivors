@@ -131,20 +131,20 @@ body {
 }
 .site-nav nav { margin: 0 auto; }
 .site-nav ul { display: flex; align-items: center; gap: 16px; list-style: none; margin: 0; padding: 0 16px; }
-.site-nav ul button { position: relative; display: flex; align-items: center; justify-content: center; gap: 8px; font: inherit; font-size: 15px; font-weight: 400; line-height: normal; letter-spacing: 4.5px; text-transform: uppercase; white-space: nowrap; color: inherit; background: none; border: 0; padding: 0 8px; cursor: pointer; }
-.site-nav ul button kbd { font: inherit; font-size: 11px; color: #8e8e8e; }
+.site-nav ul :is(button, a) { position: relative; display: flex; align-items: center; justify-content: center; gap: 8px; font: inherit; font-size: 15px; font-weight: 400; line-height: normal; letter-spacing: 4.5px; text-transform: uppercase; white-space: nowrap; color: inherit; background: none; border: 0; padding: 0 8px; cursor: pointer; }
+.site-nav ul :is(button, a) kbd { font: inherit; font-size: 11px; color: #8e8e8e; }
 /* Enlarge the hit area without enlarging the reference's compact highlight. */
-.site-nav ul button::before { content: ""; position: absolute; inset: -12px 0; }
-.site-nav ul button[aria-disabled="true"] { pointer-events: none; }
-.site-nav ul button:is([aria-current="page"], :focus-visible, :active) { background: #fff; color: #0a0a0a; }
-.site-nav ul button:is([aria-current="page"], :focus-visible, :active) kbd { color: inherit; }
-.site-nav button:focus-visible { outline: 2px solid #fff; outline-offset: 4px; }
+.site-nav ul :is(button, a)::before { content: ""; position: absolute; inset: -12px 0; }
+.site-nav ul :is(button, a)[aria-disabled="true"] { pointer-events: none; }
+.site-nav ul :is(button, a):is([aria-current="page"], :focus-visible, :active) { background: #fff; color: #0a0a0a; }
+.site-nav ul :is(button, a):is([aria-current="page"], :focus-visible, :active) kbd { color: inherit; }
+.site-nav :is(button, a):focus-visible { outline: 2px solid #fff; outline-offset: 4px; }
 @media (hover: hover) {
-  .site-nav ul button:hover { background: #fff; color: #0a0a0a; }
-  .site-nav ul button:hover kbd { color: inherit; }
+  .site-nav ul :is(button, a):hover { background: #fff; color: #0a0a0a; }
+  .site-nav ul :is(button, a):hover kbd { color: inherit; }
 }
 @media (max-width: 900px) {
-  .site-nav ul button kbd { display: none; }
+  .site-nav ul :is(button, a) kbd { display: none; }
 }
 @keyframes site-nav-enter { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: none; } }
 
@@ -163,16 +163,18 @@ body {
   will-change: transform;
 }
 .site-card[data-closing="true"] { pointer-events: none; }
-.site-card-inner { min-height: 100vh; min-height: 100svh; width: 100%; display: flex; flex-direction: column; justify-content: center; gap: 20px; padding: 96px clamp(24px, 8vw, 120px) 48px; }
-.site-card-eyebrow { font-family: var(--font-geist-mono), monospace; font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; opacity: 0.5; }
-.site-card h2 { font-size: clamp(44px, 9vw, 120px); font-weight: 650; letter-spacing: -0.04em; line-height: 0.95; }
-.site-card-inner > p:not(.site-card-eyebrow) { max-width: 46ch; font-size: 17px; line-height: 1.5; opacity: 0.7; }
-.site-card-close { align-self: flex-start; margin-top: 12px; font: inherit; font-size: 13px; padding: 10px 18px; border: 1px solid color-mix(in srgb, var(--foreground) 25%, transparent); border-radius: 999px; background: none; color: inherit; cursor: pointer; transition: background 200ms ease-out, color 200ms ease-out; }
-.site-card-close:hover { background: var(--foreground); color: #000; }
-.site-card button:focus-visible { outline: 2px solid var(--foreground); outline-offset: 4px; }
+.site-card-inner { width: 100%; }
+.section-intro { min-height: 100vh; min-height: 100svh; display: flex; flex-direction: column; justify-content: flex-end; gap: 32px; padding: 112px 32px 32px; background: #0a0a0a; font-family: var(--font-geist-sans), sans-serif; }
+.section-intro h1 { margin: 0; color: #fff; font-size: 47px; font-weight: 700; line-height: 40px; letter-spacing: 0; overflow-wrap: anywhere; }
+.section-intro-text { color: #8e8e8e; font-size: 26px; font-weight: 600; line-height: normal; letter-spacing: 0; columns: 2; column-gap: 16px; white-space: pre-wrap; overflow-wrap: anywhere; }
+@media (max-width: 700px) {
+  .section-intro { padding: 112px 20px 24px; gap: 24px; }
+  .section-intro h1 { font-size: clamp(34px, 7.5vw, 47px); line-height: calc(40 / 47); }
+  .section-intro-text { columns: 1; font-size: clamp(21px, 4.8vw, 26px); line-height: normal; }
+}
 @media (max-width: 580px) {
   .site-nav ul { gap: clamp(4px, 1.4vw, 8px); padding-inline: 8px; }
-  .site-nav ul button { font-size: clamp(10px, 2.6vw, 15px); letter-spacing: 0.2em; padding-inline: 4px; }
+  .site-nav ul :is(button, a) { font-size: clamp(10px, 2.6vw, 15px); letter-spacing: 0.2em; padding-inline: 4px; }
 }
 @media (prefers-reduced-motion: reduce) {
   .site-nav { animation: none; }

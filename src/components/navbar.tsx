@@ -1,18 +1,12 @@
 "use client"
 
-import { useEffect, useState } from "react"
-import { createCardEngine, type Card } from "./card-engine"
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react"
+import Link from "next/link"
+import { usePathname, useRouter } from "next/navigation"
+import { sections, sectionFromPath, SectionContent, type SectionId } from "./sections"
+import { createCardEngine } from "./card-engine"
 import { loadCardSettings, useCardSettings } from "./card-settings"
 import { SHORTCUT_KEYS } from "./shortcuts"
-
-/** Each section owns one card. */
-const sections = [
-  { id: "about", label: "About", key: SHORTCUT_KEYS[1], title: "The studio", body: "Placeholder copy. Who we are, how we work and what we believe in." },
-  { id: "services", label: "Services", key: SHORTCUT_KEYS[2], title: "Our services", body: "Placeholder copy. Our services and capabilities will live here once this section is designed." },
-  { id: "work", label: "Work", key: SHORTCUT_KEYS[3], title: "Selected work", body: "Placeholder copy. Projects, case studies and client names will live here once the portfolio is designed." },
-] as const
-
-type SectionId = (typeof sections)[number]["id"]
 
 /** Scroll distance for one full slide, as a fraction of viewport height. 1:1 and linear. */
 const SCROLL_TRAVEL = 0.8
@@ -21,7 +15,7 @@ const SCROLL_TRAVEL = 0.8
  * Centered nav over the hero. Each link owns one full-screen card (three max)
  * stacked over the others.
  *
- * - Nav button or letter key ([A] [W] [S]): timed slide, triggered instantly on press. Delay, duration,
+ * - Nav link or letter key (W/S/D; A returns home): timed slide, triggered instantly on press. Delay, duration,
  *   ease and unlock time are in the properties panel (Cards tab; default 1.5s quartic ease-in).
  *   Buttons are locked until 100ms before it ends.
  * - Scroll / swipe: scrubbed. Down pulls the next section's card in, up pushes
@@ -32,9 +26,35 @@ const SCROLL_TRAVEL = 0.8
  * A small rAF engine instead of ScrollTrigger: the page has no document scroll
  * to pin or scrub against, and button tweens must share the same positions.
  */
-export function Navbar() {
-  const [cards, setCards] = useState<Card<SectionId>[]>([])
-  const [engine] = useState(() => createCardEngine<SectionId>(sections.map(s => s.id), setCards))
+export function Navbar({ children }: { children: ReactNode }) {
+  const pathname = usePathname()
+  const router = useRouter()
+  const routedPath = useRef(pathname)
+  const syncingRoute = useRef(false)
+  const [engine] = useState(() => createCardEngine<SectionId>(
+    sections.map(s => s.id), () => {}, sectionFromPath(pathname),
+  ))
+  const [cards, setCards] = useState(() => engine.snapshot())
+
+  useLayoutEffect(() => {
+    return engine.subscribe(next => {
+      setCards(next)
+      const front = next.filter(c => !c.closing).at(-1)
+      const destination = front ? `/${front.id}` : "/"
+      if (!syncingRoute.current && destination !== routedPath.current) {
+        routedPath.current = destination
+        router.push(destination, { scroll: false })
+      }
+    })
+  }, [router, engine])
+
+  useLayoutEffect(() => {
+    if (pathname === routedPath.current) return
+    routedPath.current = pathname
+    syncingRoute.current = true
+    engine.navigate(sectionFromPath(pathname))
+    syncingRoute.current = false
+  }, [pathname, engine])
   useEffect(() => () => engine.destroy(), [engine])
 
   const { openMs, openDelayMs } = useCardSettings()
@@ -116,11 +136,11 @@ export function Navbar() {
         <nav aria-label="Primary">
           <ul>
             <li>
-              <button type="button" aria-current={!hasCards ? "page" : undefined} aria-keyshortcuts={SHORTCUT_KEYS[0].toUpperCase()} onClick={() => engine.closeAll()}><span>Home</span><kbd aria-hidden="true">[{SHORTCUT_KEYS[0].toUpperCase()}]</kbd></button>
+              <Link href="/" scroll={false} aria-current={!hasCards ? "page" : undefined} aria-keyshortcuts={SHORTCUT_KEYS[0].toUpperCase()} onNavigate={event => { event.preventDefault(); engine.closeAll() }}><span>Home</span><kbd aria-hidden="true">[{SHORTCUT_KEYS[0].toUpperCase()}]</kbd></Link>
             </li>
             {sections.map(s => (
               <li key={s.id}>
-                <button type="button" aria-current={top?.id === s.id ? "page" : undefined} aria-keyshortcuts={s.key.toUpperCase()} aria-disabled={locked || undefined} onClick={() => { if (!locked) engine.open(s.id) }}><span>{s.label}</span><kbd aria-hidden="true">[{s.key.toUpperCase()}]</kbd></button>
+                <Link href={`/${s.id}`} scroll={false} aria-current={top?.id === s.id ? "page" : undefined} aria-keyshortcuts={s.key.toUpperCase()} aria-disabled={locked || undefined} onNavigate={event => { event.preventDefault(); if (!locked) engine.open(s.id) }}><span>{s.label}</span><kbd aria-hidden="true">[{s.key.toUpperCase()}]</kbd></Link>
               </li>
             ))}
             <li>
@@ -129,6 +149,11 @@ export function Navbar() {
           </ul>
         </nav>
       </header>
+      {/* Keep the route outlet rendered even when Home has no card. The page
+          can return null, but Next still needs to visit its segment boundary. */}
+      {!cards.some(card => sectionFromPath(pathname) === card.id) && (
+        <div hidden={sectionFromPath(pathname) !== undefined}>{children}</div>
+      )}
       {cards.map((card, index) => {
         const section = sections.find(s => s.id === card.id) ?? sections[0]
         return (
@@ -139,13 +164,11 @@ export function Navbar() {
             data-closing={card.closing ? "true" : undefined}
             inert={card !== top}
             aria-label={section.title}
-            style={{ zIndex: 15 + index }}
+            style={{ zIndex: 15 + index, transform: "none" }}
           >
             <div className="site-card-inner">
-              <p className="site-card-eyebrow">{String(sections.indexOf(section) + 1).padStart(2, "0")} — {section.label}</p>
-              <h2>{section.title}</h2>
-              <p>{section.body}</p>
-              <button type="button" className="site-card-close" onClick={() => engine.closeAll()}>Close</button>
+              {sectionFromPath(pathname) === card.id ? children : <SectionContent id={card.id} />}
+
             </div>
           </aside>
         )
