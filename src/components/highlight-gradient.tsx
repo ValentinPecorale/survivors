@@ -224,10 +224,19 @@ export function wordIndexAt(progress: number, count: number, hold: number) {
 const settled = (distance: number) => Math.min(1, Math.max(0, 1 - (distance - 0.03) / 0.17))
 
 /**
- * Figma 27:414, as a pinned sequence. The frame sticks to the screen while the card scrolls; scrolling moves one
- * word at a time up from the bottom edge to the centre, pushing the previous word out of the top. Once a word
- * has landed, the gradient appears around it (sized to the word's own width) and the word gets its inner
- * shadow; both fade out as it leaves. The last word landing on the gradient is the end of the section.
+ * How much of the current word (and its gradient and shadow) is left while the next word rises toward it.
+ * `distance` is how far the next word still is from the centre, in steps (1 = just entering at the bottom).
+ * The current word does not move: it stays fully there until the newcomer is half a step away, then fades out
+ * and is gone by 0.2, before the newcomer arrives, so the two never overlap.
+ */
+const leaving = (distance: number) => smooth(Math.min(1, Math.max(0, (distance - 0.2) / 0.3)))
+
+/**
+ * Figma 27:414, as a pinned sequence. The frame sticks to the screen while the card scrolls, and the centre never
+ * scrolls: the current word and its gradient stay exactly where they are. Scrolling brings the next word up from
+ * the bottom edge; as it nears the centre the current word and gradient fade out, and once it has landed the
+ * gradient appears around it (sized to the word's own width) and it gets its inner shadow. The last word landing
+ * on the gradient is the end of the section.
  *
  * One gradient (one WebGL canvas) serves all words: it is resized to whichever word is nearest, and is invisible
  * whenever a word is travelling, so it never has to be in two places at once.
@@ -266,21 +275,28 @@ export function HighlightFrame({ id, words }: { id: string; words: readonly stri
       const height = frameEl.clientHeight
       const progress = (scroller.scrollTop - trackEl.offsetTop) / Math.max(1, scroller.clientHeight * s.wordScroll / 100)
       const t = wordIndexAt(progress, count, h)
+      // Nothing ever travels upward. A word below the centre rises to it; a word at or past the centre stays put
+      // and fades out when the next word gets close. `strength` is its gradient/shadow (and, once it is the
+      // current word, its own opacity).
+      let active = 0, glow = 0
       for (let i = 0; i < count; i++) {
         const item = items.current[i]
         if (!item) continue
-        const offset = i - t
-        item.style.visibility = Math.abs(offset) < 1.05 ? "visible" : "hidden"
-        item.style.transform = `translate(-50%, -50%) translateY(${(offset * height).toFixed(1)}px)`
-        const shade = s.shadowEnabled ? settled(Math.abs(offset)) : 0
+        const ahead = i - t // steps still to rise (> 0), or 0 once it has arrived
+        const strength = ahead > 0 ? settled(ahead) : i < count - 1 ? leaving(i + 1 - t) : 1
+        const alpha = ahead > 0 ? 1 : strength
+        item.style.visibility = ahead >= 1.02 || alpha <= 0.001 ? "hidden" : "visible"
+        item.style.opacity = alpha.toFixed(3)
+        item.style.transform = `translate(-50%, -50%) translateY(${(Math.max(ahead, 0) * height).toFixed(1)}px)`
+        const shade = s.shadowEnabled ? strength : 0
         const text = item.firstElementChild as HTMLElement | null
         if (text) text.style.filter = shade > 0.01 ? `url(#${uid}-shadow-${i})` : "none"
         floods.current[i]?.setAttribute("flood-opacity", (s.shadowOpacity * shade).toFixed(3))
+        if (strength > glow) { glow = strength; active = i }
       }
-      const active = Math.min(count - 1, Math.max(0, Math.round(t)))
+      // One gradient serves every word: it takes the size of whichever word is strongest right now.
       const label = items.current[active]?.firstElementChild as HTMLElement | null
       if (label) { stageEl.style.width = `${label.offsetWidth}px`; stageEl.style.height = `${label.offsetHeight}px` }
-      const glow = settled(Math.abs(active - t))
       stageEl.style.opacity = glow.toFixed(3)
       stageEl.style.visibility = glow > 0.001 ? "visible" : "hidden"
       idle.current = glow <= 0.001
