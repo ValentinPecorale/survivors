@@ -242,7 +242,7 @@ export function HighlightFrame({ id, words: contentWords }: { id: string; words:
   const uid = useId().replace(/:/g, "")
   // The panel can override the words (one per line); empty means the About content.
   const words = useMemo(() => { const custom = parseWords(g.typeWords); return custom.length ? custom : contentWords }, [g.typeWords, contentWords])
-  const timeline = useMemo(() => buildTimeline(words, g.typeBeat), [words, g.typeBeat])
+  const timeline = useMemo(() => buildTimeline(words, g.typeBeat, g.typeHold), [words, g.typeBeat, g.typeHold])
   const [step, setStep] = useState(0)
   const track = useRef<HTMLDivElement>(null)
   const frame = useRef<HTMLElement>(null)

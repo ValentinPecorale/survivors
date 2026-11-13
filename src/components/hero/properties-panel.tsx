@@ -252,7 +252,9 @@ export function PropertiesPanel({ ascii, model, onAscii, onModel, status }: Prop
             <label className="property-custom">Words · one per line<textarea aria-label="Words" rows={5} spellCheck={false} value={gradient.typeWords || about.words.join("\n")} onChange={e => gr("typeWords", e.target.value)} /></label>
             <p className="property-help">Empty (or cleared) uses the words from the About content in Keystatic. Edits here are live and kept by Save as default. The last word, fully typed, is the end of the section.</p>
             <Range label="Scroll per keypress · px" value={gradient.typeSensitivity} min={20} max={200} step={5} onChange={v => gr("typeSensitivity", v)} />
-            <Range label="Pause between words · steps" value={gradient.typeBeat} min={0} max={6} step={1} onChange={v => gr("typeBeat", v)} />
+            <Range label="Hold on word · steps" value={gradient.typeHold} min={0} max={40} step={1} onChange={v => gr("typeHold", v)} />
+            <Range label="Empty gap · steps" value={gradient.typeBeat} min={0} max={12} step={1} onChange={v => gr("typeBeat", v)} />
+            <p className="property-help">Hold is how long a finished word stays on screen before it starts being deleted, so it can be read. Empty gap is the blank moment between one word going and the next appearing. One step is one keypress of scroll.</p>
             <Toggle label="Reversible" value={gradient.typeReversible} onChange={v => gr("typeReversible", v)} />
             <Toggle label="Step counter" value={gradient.typeHud} onChange={v => gr("typeHud", v)} />
             <p className="property-help">The frame stays pinned and every step of scroll is one keypress: the word is deleted letter by letter, then the next is typed. Reversible: scrolling back undoes the keypresses; off, typed text stays. The gradient hugs the text as it changes.</p>

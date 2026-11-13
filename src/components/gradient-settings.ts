@@ -22,7 +22,8 @@ export const defaultGradientSettings = {
   softness: 0.7,   // how far colours blend into each other
   // Typewriter (About frame): every step of scroll is one keypress
   typeSensitivity: 80, // px of scroll per keypress
-  typeBeat: 1,         // empty steps between deleting a word and typing the next
+  typeBeat: 2,         // empty steps between deleting a word and typing the next
+  typeHold: 8,         // steps a finished word stays on screen before it is deleted: time to read it
   typeWords: "",       // one word or phrase per line; empty = the words from the About content (Keystatic)
   typeReversible: true, // scrolling back undoes keypresses (off: once typed, it stays)
   typeSize: 39,        // px
@@ -73,7 +74,8 @@ export function loadGradientSettings() {
       warp: num(s.warp, d.warp, 0, 1),
       softness: num(s.softness, d.softness, 0, 1),
       typeSensitivity: num(s.typeSensitivity, d.typeSensitivity, 20, 200),
-      typeBeat: Math.round(num(s.typeBeat, d.typeBeat, 0, 6)),
+      typeBeat: Math.round(num(s.typeBeat, d.typeBeat, 0, 12)),
+      typeHold: Math.round(num(s.typeHold, d.typeHold, 0, 40)),
       typeWords: typeof s.typeWords === "string" ? s.typeWords.slice(0, 600) : d.typeWords,
       typeReversible: typeof s.typeReversible === "boolean" ? s.typeReversible : d.typeReversible,
       typeSize: num(s.typeSize, d.typeSize, 16, 120),
