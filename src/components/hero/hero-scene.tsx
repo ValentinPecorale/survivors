@@ -4,7 +4,7 @@
 
 import { useShaderLabPostProcessingSource } from "@basementstudio/shader-lab"
 import { useAnimations, useGLTF } from "@react-three/drei"
-import { unlockStepSound, playStep, PAWS, STEP_PERIOD, STEPS_PER_LOOP } from "./step-sound"
+import { unlockAudio, updateAmbient, updateSteps } from "./sound"
 import { Canvas, createPortal, useFrame, useThree } from "@react-three/fiber"
 import { useEffect, useLayoutEffect, useMemo, useRef } from "react"
 import * as THREE from "three"
@@ -145,26 +145,22 @@ function Plants({ settings, orbitTarget, subjectFrame }: { settings: ModelSettin
     return () => { originals.forEach((material, mesh) => { mesh.material = material }); created.forEach(material => material.dispose()) }
   }, [scene, settings.material, settings.wireframe])
   useEffect(() => { if (settings.spin === 0) spin.current = 0 }, [settings.spin])
-  const lastStep = useRef<number[]>([])
   // A saved preset can start with sound on; browsers keep audio locked until the first gesture.
   useEffect(() => {
-    if (!settings.stepSound) return
-    const unlock = () => unlockStepSound()
+    if (!settings.stepSound && !settings.ambientSound) return
+    const unlock = () => unlockAudio()
     window.addEventListener("pointerdown", unlock, { once: true }); window.addEventListener("keydown", unlock, { once: true })
     return () => { window.removeEventListener("pointerdown", unlock); window.removeEventListener("keydown", unlock) }
-  }, [settings.stepSound])
+  }, [settings.stepSound, settings.ambientSound])
+  useEffect(() => {
+    updateAmbient(settings.ambientSound, settings.ambientVolume)
+    // Re-poll while enabled: picks up the file once decoded, or the context once unlocked.
+    const poll = settings.ambientSound ? window.setInterval(() => updateAmbient(true, settings.ambientVolume), 500) : 0
+    return () => { if (poll) window.clearInterval(poll) }
+  }, [settings.ambientSound, settings.ambientVolume])
   useFrame((_, delta) => {
-    // Footsteps: one thud per paw contact (4 per stride), locked to the clip clock so speed, pause and seek stay in sync.
-    // Only consecutive forward contacts sound; seeking or ping-pong reversing stays silent.
-    if (settings.stepSound && settings.playing && clip) {
-      PAWS.forEach((paw, i) => {
-        const index = Math.floor((clip.time - paw.phase - settings.stepOffset) / STEP_PERIOD)
-        const wrapped = ((index % STEPS_PER_LOOP) + STEPS_PER_LOOP) % STEPS_PER_LOOP
-        const last = lastStep.current[i] ?? -1
-        if (last >= 0 && wrapped !== last && (wrapped - last + STEPS_PER_LOOP) % STEPS_PER_LOOP === 1) playStep(settings.stepVolume, i)
-        lastStep.current[i] = wrapped
-      })
-    } else lastStep.current = []
+    // Recorded footsteps, phase-locked to the clip clock (see sound.ts). Ping-pong reverses time, so it stays silent there.
+    updateSteps({ enabled: settings.stepSound && settings.repeat !== "pingpong", playing: settings.playing, volume: settings.stepVolume, speed: settings.speed, clipTime: clip?.time ?? 0, offset: settings.stepOffset })
     const state = cursor.current
     // Exponential damping reaches 95% of the target within the smoothing time.
     // Clamp delta so restoring a background tab cannot produce a large jump.

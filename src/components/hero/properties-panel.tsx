@@ -1,6 +1,6 @@
 "use client"
 
-import { unlockStepSound } from "./step-sound"
+import { unlockAudio } from "./sound"
 import { useId, useState, type CSSProperties, type ReactNode } from "react"
 import { saveDefaultSettings } from "./settings-preset"
 import { bezierEase, defaultCardSettings, easePresets, saveCardSettings, setCardSettings, useCardSettings, type Bezier, type CardSettings } from "../card-settings"
@@ -179,10 +179,12 @@ export function PropertiesPanel({ ascii, model, onAscii, onModel, status }: Prop
             <p className="property-help">Pause to hold a frame. Seek to move through the animation.</p>
           </Group>
           <Group title="Sound">
-            <Toggle label="Paw steps" value={model.stepSound} onChange={v => { if (v) unlockStepSound(); m("stepSound", v) }} />
-            {mr("Volume", "stepVolume", 0, 1)}
-            {mr("Sync offset · seconds", "stepOffset", -0.2, 0.2, 0.01)}
-            <p className="property-help">Four thuds per stride, one per paw (hind pair, then fore pair; timings read from the animation), so it follows Speed, Play and Seek. Off by default; browsers only allow audio after a click. Nudge the offset if it lands early or late against the paws.</p>
+            <Toggle label="Ambience · sea cave" value={model.ambientSound} onChange={v => { if (v) unlockAudio(); m("ambientSound", v) }} />
+            {mr("Ambience volume", "ambientVolume", 0, 1)}
+            <Toggle label="Tiger footsteps" value={model.stepSound} onChange={v => { if (v) unlockAudio(); m("stepSound", v) }} />
+            {mr("Footsteps volume", "stepVolume", 0, 1)}
+            {mr("Footsteps sync · seconds", "stepOffset", -0.2, 0.2, 0.01)}
+            <p className="property-help">Both off by default; browsers only allow audio after a click. Footsteps are retimed to the stride, so they follow Speed, Play and Seek (silent in ping-pong). Nudge sync if the thuds land early or late against the paws. Use Save as default to keep your levels.</p>
           </Group>
           <Group title="Environment material">
             <Select label="Material" value={model.material} options={[["original", "Original"], ["clay", "Clay"], ["normal", "Normals"]]} onChange={v => m("material", v)} />
