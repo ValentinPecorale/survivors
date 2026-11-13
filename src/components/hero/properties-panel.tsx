@@ -179,6 +179,11 @@ export function PropertiesPanel({ ascii, model, onAscii, onModel, status }: Prop
             <p className="property-help">Pause to hold a frame. Seek to move through the animation.</p>
           </Group>
           <Group title="Sound">
+            <Toggle label="Fade out on sections" value={model.sectionFade} onChange={v => m("sectionFade", v)} />
+            {model.sectionFade && <>
+              {mr("Fade out · seconds", "sectionFadeOut", 0.1, 3, 0.1)}
+              {mr("Fade in · seconds", "sectionFadeIn", 0.1, 3, 0.1)}
+            </>}
             <Toggle label="Music" value={model.ambientSound} onChange={v => { if (v) unlockAudio(); m("ambientSound", v) }} />
             <Select label="Song" value={model.ambientTrack} options={Object.entries(TRACKS).map(([id, t]) => [id, t.label] as [string, string])} onChange={v => m("ambientTrack", v)} />
             {mr("Music volume", "ambientVolume", 0, 1)}

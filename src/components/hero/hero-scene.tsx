@@ -4,7 +4,7 @@
 
 import { useShaderLabPostProcessingSource } from "@basementstudio/shader-lab"
 import { useAnimations, useGLTF } from "@react-three/drei"
-import { unlockAudio, updateAmbient, updateSteps, hoverMove, hoverStop, preloadHover } from "./sound"
+import { unlockAudio, updateAmbient, updateSteps, hoverMove, hoverStop, preloadHover, setAudioGate } from "./sound"
 import { createPlantPicker } from "./plant-hover"
 import { Canvas, createPortal, useFrame, useThree } from "@react-three/fiber"
 import { useEffect, useLayoutEffect, useMemo, useRef } from "react"
@@ -16,7 +16,7 @@ import landingKeys from "./camera-landing.json"
 import { projectedBounds, type TigerFrame } from "./camera-framing"
 import { useAsciiHover } from "./ascii-hover"
 import { Tiger } from "./tiger"
-import { getCardSettings, scrollCamera } from "../card-settings"
+import { getCardSettings, scrollCamera, sectionAudio } from "../card-settings"
 import { asciiConfig, columnsFor } from "./ascii-config"
 import { FloorText } from "./floor-text"
 
@@ -201,6 +201,8 @@ function Plants({ settings, orbitTarget, subjectFrame }: { settings: ModelSettin
     return () => { if (poll) window.clearInterval(poll) }
   }, [settings.ambientSound, settings.ambientVolume, settings.ambientTrack])
   useFrame((_, delta) => {
+    // Leaving the hero for a section fades all sound out and pauses it; returning fades it back in.
+    setAudioGate(settings.sectionFade && sectionAudio.open, settings.sectionFadeOut, settings.sectionFadeIn)
     // Recorded footsteps, phase-locked to the clip clock (see sound.ts). Ping-pong reverses time, so it stays silent there.
     updateSteps({ enabled: settings.stepSound && settings.repeat !== "pingpong", playing: settings.playing, volume: settings.stepVolume, speed: settings.speed, clipTime: clip?.time ?? 0, offset: settings.stepOffset })
     const state = cursor.current

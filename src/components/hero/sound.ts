@@ -43,10 +43,48 @@ function context() {
   return ctx
 }
 
+/** Every sound goes through this one gain, so the section fade is a single ramp. */
+let bus: GainNode | null = null
+function output(c: AudioContext) {
+  if (!bus) { bus = c.createGain(); bus.connect(c.destination) }
+  return bus
+}
+
+let gated = false
+let gateTimer = 0
+/**
+ * Section gate. closed=true (a section card is open): ramp everything down over fadeOut seconds, then suspend
+ * the AudioContext so nothing plays or runs. closed=false: resume, ramp back up over fadeIn seconds. Music and
+ * footsteps continue where they left off, because the context's clock itself was paused.
+ */
+export function setAudioGate(closed: boolean, fadeOut: number, fadeIn: number) {
+  if (closed === gated) return
+  gated = closed
+  const c = ctx
+  if (!c) return // nothing has played yet; the flag alone decides whether unlockAudio may start it
+  const gain = output(c).gain
+  window.clearTimeout(gateTimer)
+  if (closed) {
+    const now = c.currentTime, seconds = Math.max(0.05, fadeOut)
+    gain.cancelScheduledValues(now)
+    gain.setValueAtTime(gain.value, now)
+    gain.linearRampToValueAtTime(0, now + seconds)
+    gateTimer = window.setTimeout(() => { if (gated) void c.suspend() }, seconds * 1000 + 80)
+  } else {
+    void c.resume().then(() => {
+      if (gated) return
+      const now = c.currentTime
+      gain.cancelScheduledValues(now)
+      gain.setValueAtTime(gain.value, now)
+      gain.linearRampToValueAtTime(1, now + Math.max(0.05, fadeIn))
+    })
+  }
+}
+
 /** Call from a user gesture (panel toggle, or the first click/key afterwards) or browsers keep audio suspended. */
 export function unlockAudio() {
   const c = context()
-  if (c && c.state === "suspended") void c.resume()
+  if (c && c.state === "suspended" && !gated) void c.resume()
 }
 
 /** Returns the decoded buffer, or null while it is still downloading/decoding (the next call picks it up). */
@@ -86,7 +124,7 @@ export function updateAmbient(enabled: boolean, volume: number, track: string) {
       const gain = c.createGain()
       source.buffer = buffer; source.loop = true
       gain.gain.value = 0.0001
-      source.connect(gain).connect(c.destination)
+      source.connect(gain).connect(output(c))
       source.start()
       ambient = { id: def.url, source, gain }
     }
@@ -119,7 +157,7 @@ function startRun(c: AudioContext, buffer: AudioBuffer, pos: number, rate: numbe
   source.playbackRate.value = rate
   gain.gain.setValueAtTime(0.0001, c.currentTime)
   gain.gain.linearRampToValueAtTime(level, c.currentTime + 0.025)
-  source.connect(gain).connect(c.destination)
+  source.connect(gain).connect(output(c))
   source.start(0, pos)
   run = { source, gain, pos, last: c.currentTime, rate }
 }
@@ -178,7 +216,7 @@ export function playRustle(kind: keyof typeof RUSTLE, volume: number, pan: numbe
   const t = c.currentTime
   const out = c.createStereoPanner()
   out.pan.value = Math.max(-1, Math.min(1, pan))
-  out.connect(c.destination)
+  out.connect(output(c))
   for (let i = 0; i < r.grains; i++) {
     const start = t + i * (r.length * 0.45) + Math.random() * 0.02
     const length = r.length * (0.7 + Math.random() * 0.6)
@@ -289,7 +327,7 @@ export function hoverMove(id: string, over: HoverKind | null, volume: number, pa
     const master = c.createGain()
     const panner = c.createStereoPanner()
     master.gain.value = 0.0001
-    master.connect(panner).connect(c.destination)
+    master.connect(panner).connect(output(c))
     const voice: HoverVoice = { master, panner, nextAt: c.currentTime, lastMove: now, timer: 0, kind: over, buffer, avoid: def.avoid }
     // Keeps segments coming between pointer events, and releases once the pointer has been still.
     voice.timer = window.setInterval(() => {

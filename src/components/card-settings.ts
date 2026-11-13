@@ -71,6 +71,12 @@ export function bezierEase(b: Bezier) {
  */
 export const scrollCamera = { progress: 0 }
 
+/**
+ * True while any section card is open (written by navbar.tsx, read every frame by hero-scene.tsx).
+ * Drives the audio fade: leaving the hero fades sound out and pauses it; coming back fades it in.
+ */
+export const sectionAudio = { open: false }
+
 let current: CardSettings = defaultCardSettings
 const listeners = new Set<() => void>()
 const emit = () => listeners.forEach(l => l())

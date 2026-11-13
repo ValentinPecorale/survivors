@@ -5,7 +5,7 @@ import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import { sections, sectionFromPath, SectionContent, type SectionId } from "./sections"
 import { createCardEngine } from "./card-engine"
-import { loadCardSettings, useCardSettings } from "./card-settings"
+import { loadCardSettings, sectionAudio, useCardSettings } from "./card-settings"
 import { SHORTCUT_KEYS } from "./shortcuts"
 
 /** Scroll distance for one full slide, as a fraction of viewport height. 1:1 and linear. */
@@ -70,6 +70,7 @@ export function Navbar({ children }: { children: ReactNode }) {
   const live = cards.filter(c => !c.closing)
   const top = live[live.length - 1]
   const hasCards = live.length > 0
+  useEffect(() => { sectionAudio.open = hasCards }, [hasCards])
 
   useEffect(() => {
     if (!hasCards) return
