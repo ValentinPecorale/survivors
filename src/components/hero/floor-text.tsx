@@ -20,9 +20,12 @@ export function FloorText({ settings }: { settings: ModelSettings }) {
   const size = useThree(s => s.size)
   const frame = useMemo(() => ({ width: Math.max(1, size.width), height: Math.max(1, size.height) }), [size.width, size.height])
   const config = useMemo(() => textComposition(settings, frame), [settings, frame])
-  // Match 100vw × 100vh without stretching the filter or allocating a large
-  // desktop render target. Both texture axes share the same resolution scale.
-  const resolutionScale = Math.min(1, 1024 / Math.max(frame.width, frame.height))
+  // The plane covers the viewport, so the glyph texture must be rendered at (nearly) screen pixels or the
+  // ASCII edges turn blocky when magnified. Device pixels, capped: 2560 on desktop, 1536 on touch devices.
+  // It only re-renders when the text animation changes (see rendered ref), so the larger target is cheap.
+  const dpr = useThree(s => s.viewport.dpr)
+  const maxEdge = typeof window !== "undefined" && window.matchMedia("(pointer: coarse)").matches ? 1536 : 2560
+  const resolutionScale = Math.min(dpr, maxEdge / Math.max(frame.width, frame.height))
   const renderWidth = Math.max(1, Math.round(frame.width * resolutionScale))
   const renderHeight = Math.max(1, Math.round(frame.height * resolutionScale))
   const composition = useRef<ShaderLabTextureSource | null>(null)
