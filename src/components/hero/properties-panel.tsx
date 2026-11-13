@@ -247,6 +247,11 @@ export function PropertiesPanel({ ascii, model, onAscii, onModel, status }: Prop
         </div>
       </> : tab === "gradient" ? <>
         <div className="property-card">
+          <Group title="Word sequence">
+            <Range label="Scroll per word · vh" value={gradient.wordScroll} min={40} max={200} step={5} onChange={v => gr("wordScroll", v)} />
+            <Range label="Hold at center · %" value={gradient.wordHold} min={0} max={60} step={5} onChange={v => gr("wordHold", v)} />
+            <p className="property-help">The frame stays pinned while you scroll: each word rises from the bottom to the center, and the gradient and inner shadow appear once it has landed. Hold is how long a word rests at the center, as a share of one step, before the next one starts.</p>
+          </Group>
           <Group title="Palette">
             <Color label="Cursor light" value={gradient.highlight} onChange={v => gr("highlight", v)} />
             <Color label="Midtone" value={gradient.slate} onChange={v => gr("slate", v)} />

@@ -1,7 +1,7 @@
 "use client"
 
 import Image from "next/image"
-import { useEffect, useRef, type RefObject } from "react"
+import { useEffect, useId, useRef, type CSSProperties, type RefObject } from "react"
 import { useGradientSettings, type GradientSettings } from "./gradient-settings"
 
 /*
@@ -110,7 +110,8 @@ function drawPoster(canvas: HTMLCanvasElement, settings: GradientSettings, aspec
   ctx.putImageData(image, 0, 0)
 }
 
-function MeshGradient({ settings, surface, box }: { settings: GradientSettings; surface: RefObject<HTMLElement | null>; box: RefObject<HTMLElement | null> }) {
+/** `idle.current` true = the gradient is invisible right now (between words), so skip drawing it. */
+function MeshGradient({ settings, surface, box, idle }: { settings: GradientSettings; surface: RefObject<HTMLElement | null>; box: RefObject<HTMLElement | null>; idle: { current: boolean } }) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const posterRef = useRef<HTMLCanvasElement>(null)
   const live = useRef(settings)
@@ -170,6 +171,7 @@ function MeshGradient({ settings, surface, box }: { settings: GradientSettings; 
     const render = (time: number) => {
       frame = 0
       if (lost || !visible || document.hidden) return
+      if (idle.current) { previous = 0; frame = requestAnimationFrame(render); return }
       const dt = previous ? Math.min(time - previous, 50) : 16.67; previous = time
       const s = live.current
       const ease = reduced.matches || s.smoothing === 0 ? 1 : 1 - Math.exp(-dt / (s.smoothing / 3))
@@ -199,40 +201,135 @@ function MeshGradient({ settings, surface, box }: { settings: GradientSettings; 
       canvas.removeEventListener("webglcontextlost", contextLost); document.removeEventListener("visibilitychange", visibility)
       gl.deleteBuffer(buffer); gl.deleteProgram(program); shaders.forEach(shader => gl.deleteShader(shader))
     }
-  }, [surface, box])
+  }, [surface, box, idle])
 
   return <><canvas ref={posterRef} className="mesh-poster" /><canvas ref={canvasRef} className="mesh-canvas" /></>
 }
 
+const smooth = (x: number) => x * x * (3 - 2 * x)
+
 /**
- * Figma 27:414 — one centred word over the gradient, which bleeds past the text on every side.
- * The word carries an inner shadow: an SVG filter that inverts the glyph alpha, offsets and blurs it, and keeps
- * only the part inside the letters, then lays it over the text (CSS has no inner shadow for text).
+ * Continuous word index (0 … count−1) for scroll progress measured in word steps. Each step is a rest at the
+ * centre (`hold` of the step) followed by a smoothstep travel to the next word: zero speed at both ends, so a
+ * word settles into the centre instead of stopping dead. The next word never moves while one is resting.
  */
-export function HighlightFrame({ id, text }: { id: string; text: string }) {
+export function wordIndexAt(progress: number, count: number, hold: number) {
+  if (count <= 1 || progress <= 0) return 0
+  if (progress >= count - 1) return count - 1
+  const step = Math.floor(progress), local = progress - step
+  return local < hold ? step : step + smooth((local - hold) / (1 - hold))
+}
+
+/** 1 while a word is at the centre, falling to 0 once it is 0.2 of a step away: the gradient and shadow only exist on a settled word. */
+const settled = (distance: number) => Math.min(1, Math.max(0, 1 - (distance - 0.03) / 0.17))
+
+/**
+ * Figma 27:414, as a pinned sequence. The frame sticks to the screen while the card scrolls; scrolling moves one
+ * word at a time up from the bottom edge to the centre, pushing the previous word out of the top. Once a word
+ * has landed, the gradient appears around it (sized to the word's own width) and the word gets its inner
+ * shadow; both fade out as it leaves. The last word landing on the gradient is the end of the section.
+ *
+ * One gradient (one WebGL canvas) serves all words: it is resized to whichever word is nearest, and is invisible
+ * whenever a word is travelling, so it never has to be in two places at once.
+ * The inner shadow is an SVG filter per word (CSS has no inner shadow for text): it inverts the glyph alpha,
+ * offsets and blurs it, and keeps only what falls inside the letters. Its opacity follows the same "settled"
+ * curve, so a word only has the shadow while it is over the gradient.
+ */
+export function HighlightFrame({ id, words }: { id: string; words: readonly string[] }) {
   const g = useGradientSettings()
-  const surface = useRef<HTMLElement>(null)
+  const uid = useId().replace(/:/g, "")
+  const track = useRef<HTMLDivElement>(null)
+  const frame = useRef<HTMLElement>(null)
+  const stage = useRef<HTMLDivElement>(null)
   const box = useRef<HTMLSpanElement>(null)
+  const items = useRef<(HTMLDivElement | null)[]>([])
+  const floods = useRef<(SVGFEFloodElement | null)[]>([])
+  const idle = useRef(false)
+  const live = useRef(g)
+  const apply = useRef<() => void>(() => {})
+  const count = words.length
+  const hold = Math.min(0.6, Math.max(0, g.wordHold / 100))
+  const steps = count > 1 ? count - 1 + hold : 0
+
+  // Settings changed in the panel: re-run the layout with the new numbers.
+  useEffect(() => { live.current = g; apply.current() }, [g])
+
+  useEffect(() => {
+    const trackEl = track.current, frameEl = frame.current, stageEl = stage.current
+    const scroller = trackEl?.closest<HTMLElement>(".site-card")
+    if (!trackEl || !frameEl || !stageEl || !scroller) return
+    let raf = 0
+    const run = () => {
+      raf = 0
+      const s = live.current
+      const h = Math.min(0.6, Math.max(0, s.wordHold / 100))
+      const height = frameEl.clientHeight
+      const progress = (scroller.scrollTop - trackEl.offsetTop) / Math.max(1, scroller.clientHeight * s.wordScroll / 100)
+      const t = wordIndexAt(progress, count, h)
+      for (let i = 0; i < count; i++) {
+        const item = items.current[i]
+        if (!item) continue
+        const offset = i - t
+        item.style.visibility = Math.abs(offset) < 1.05 ? "visible" : "hidden"
+        item.style.transform = `translate(-50%, -50%) translateY(${(offset * height).toFixed(1)}px)`
+        const shade = s.shadowEnabled ? settled(Math.abs(offset)) : 0
+        const text = item.firstElementChild as HTMLElement | null
+        if (text) text.style.filter = shade > 0.01 ? `url(#${uid}-shadow-${i})` : "none"
+        floods.current[i]?.setAttribute("flood-opacity", (s.shadowOpacity * shade).toFixed(3))
+      }
+      const active = Math.min(count - 1, Math.max(0, Math.round(t)))
+      const label = items.current[active]?.firstElementChild as HTMLElement | null
+      if (label) { stageEl.style.width = `${label.offsetWidth}px`; stageEl.style.height = `${label.offsetHeight}px` }
+      const glow = settled(Math.abs(active - t))
+      stageEl.style.opacity = glow.toFixed(3)
+      stageEl.style.visibility = glow > 0.001 ? "visible" : "hidden"
+      idle.current = glow <= 0.001
+    }
+    const schedule = () => { if (!raf) raf = requestAnimationFrame(run) }
+    apply.current = run
+    run()
+    scroller.addEventListener("scroll", schedule, { passive: true })
+    window.addEventListener("resize", schedule)
+    const observer = new ResizeObserver(schedule) // word widths change when the font loads
+    items.current.forEach(el => el && observer.observe(el))
+    void document.fonts?.ready.then(schedule)
+    return () => {
+      cancelAnimationFrame(raf); observer.disconnect()
+      scroller.removeEventListener("scroll", schedule); window.removeEventListener("resize", schedule)
+      apply.current = () => {}
+    }
+  }, [count, uid])
+
   return (
-    <section ref={surface} className="section-feature" aria-label={`${id} highlight`}>
-      <svg className="section-feature-defs" width="0" height="0" aria-hidden="true" focusable="false">
-        <filter id="section-text-inner-shadow" colorInterpolationFilters="sRGB">
-          <feComponentTransfer in="SourceAlpha" result="inverse"><feFuncA type="table" tableValues="1 0" /></feComponentTransfer>
-          <feGaussianBlur in="inverse" stdDeviation={g.shadowBlur} result="blurred" />
-          <feOffset in="blurred" dx={g.shadowX} dy={g.shadowY} result="offset" />
-          <feFlood floodColor={g.shadowColor} floodOpacity={g.shadowOpacity} result="tint" />
-          <feComposite in="tint" in2="offset" operator="in" result="shade" />
-          <feComposite in="shade" in2="SourceAlpha" operator="in" result="inner" />
-          <feMerge><feMergeNode in="SourceGraphic" /><feMergeNode in="inner" /></feMerge>
-        </filter>
-      </svg>
-      <div className="section-feature-word">
-        <span ref={box} className="section-feature-bg" aria-hidden="true">
-          <Image src="/images/about-websites.webp" alt="" fill sizes="240px" />
-          <MeshGradient settings={g} surface={surface} box={box} />
-        </span>
-        <p style={{ filter: g.shadowEnabled ? "url(#section-text-inner-shadow)" : undefined }}>{text}</p>
-      </div>
-    </section>
+    <div ref={track} className="section-feature-track" style={{ height: `calc(100svh + ${(steps * g.wordScroll).toFixed(1)}svh)` }}>
+      <section ref={frame} className="section-feature" aria-label={`${id} highlight`}>
+        <svg className="section-feature-defs" width="0" height="0" aria-hidden="true" focusable="false">
+          {words.map((_, i) => (
+            <filter key={i} id={`${uid}-shadow-${i}`} colorInterpolationFilters="sRGB">
+              <feComponentTransfer in="SourceAlpha" result="inverse"><feFuncA type="table" tableValues="1 0" /></feComponentTransfer>
+              <feGaussianBlur in="inverse" stdDeviation={g.shadowBlur} result="blurred" />
+              <feOffset in="blurred" dx={g.shadowX} dy={g.shadowY} result="offset" />
+              <feFlood ref={el => { floods.current[i] = el }} floodColor={g.shadowColor} result="tint" />
+              <feComposite in="tint" in2="offset" operator="in" result="shade" />
+              <feComposite in="shade" in2="SourceAlpha" operator="in" result="inner" />
+              <feMerge><feMergeNode in="SourceGraphic" /><feMergeNode in="inner" /></feMerge>
+            </filter>
+          ))}
+        </svg>
+        <p className="visually-hidden">{words.join(", ")}</p>
+        {/* Centred, sized to the nearest word by the layout effect; the gradient bleeds past it on every side. */}
+        <div ref={stage} className="section-feature-stage" aria-hidden="true">
+          <span ref={box} className="section-feature-bg">
+            <Image src="/images/about-websites.webp" alt="" fill sizes="240px" />
+            <MeshGradient settings={g} surface={frame} box={box} idle={idle} />
+          </span>
+        </div>
+        {words.map((word, i) => (
+          <div key={word + i} ref={el => { items.current[i] = el }} className="section-feature-word" aria-hidden="true" style={{ "--i": i } as CSSProperties}>
+            <p>{word}</p>
+          </div>
+        ))}
+      </section>
+    </div>
   )
 }
