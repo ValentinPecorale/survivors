@@ -159,11 +159,25 @@ function MeshGradient({ settings, surface, box, idle }: { settings: GradientSett
     const reduced = matchMedia("(prefers-reduced-motion: reduce)")
     let frame = 0, previous = 0, phase = 0, lost = false, visible = false
     let current = { x: -.537, y: .296 }; const target = { ...current }
+    /** Draws the current state (uniforms + one triangle). Time is advanced by render(), not here. */
+    const paint = () => {
+      const s = live.current
+      gl.uniform2f(uniforms.resolution, canvas.width, canvas.height)
+      gl.uniform2f(uniforms.cursor, current.x, current.y); gl.uniform1f(uniforms.phase, phase)
+      gl.uniform1f(uniforms.warp, s.warp); gl.uniform1f(uniforms.softness, s.softness)
+      gl.uniform1f(uniforms.size, s.size / 100); gl.uniform1f(uniforms.intensity, s.intensity / 100)
+      gl.uniform3fv(uniforms["colors[0]"], new Float32Array([s.highlight, s.shadow, s.slate, s.base].flatMap(rgb)))
+      gl.drawArrays(gl.TRIANGLES, 0, 3); canvas.style.opacity = "1"
+    }
     const resize = () => {
       const w = Math.max(1, element.clientWidth), h = Math.max(1, element.clientHeight)
       const ratio = Math.min(devicePixelRatio || 1, 1.5)
       canvas.width = Math.round(w * ratio); canvas.height = Math.round(h * ratio)
       gl.viewport(0, 0, canvas.width, canvas.height)
+      // Setting canvas.width clears it. The typewriter resizes the box on every keypress, so redraw right here:
+      // a ResizeObserver callback runs before the browser paints, which means no blank frame ever reaches the screen
+      // (waiting for the next animation frame left one blank, visible as a flicker).
+      if (!lost) paint()
     }
     // The whole frame maps onto the gradient's full range, so the light crosses the word as the mouse crosses the frame.
     const move = (event: PointerEvent) => {
@@ -182,12 +196,7 @@ function MeshGradient({ settings, surface, box, idle }: { settings: GradientSett
       const ease = reduced.matches || s.smoothing === 0 ? 1 : 1 - Math.exp(-dt / (s.smoothing / 3))
       current = { x: current.x + (target.x - current.x) * ease, y: current.y + (target.y - current.y) * ease }
       if (!s.paused && !reduced.matches) phase += dt / 1000 * s.speed * Math.PI * 2 / 7.766667
-      gl.uniform2f(uniforms.resolution, canvas.width, canvas.height)
-      gl.uniform2f(uniforms.cursor, current.x, current.y); gl.uniform1f(uniforms.phase, phase)
-      gl.uniform1f(uniforms.warp, s.warp); gl.uniform1f(uniforms.softness, s.softness)
-      gl.uniform1f(uniforms.size, s.size / 100); gl.uniform1f(uniforms.intensity, s.intensity / 100)
-      gl.uniform3fv(uniforms["colors[0]"], new Float32Array([s.highlight, s.shadow, s.slate, s.base].flatMap(rgb)))
-      gl.drawArrays(gl.TRIANGLES, 0, 3); canvas.style.opacity = "1"
+      paint()
       frame = requestAnimationFrame(render)
     }
     const start = () => { if (!frame && visible && !lost && !document.hidden) { previous = 0; frame = requestAnimationFrame(render) } }

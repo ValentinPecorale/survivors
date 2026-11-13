@@ -192,7 +192,7 @@ body {
 .mesh-canvas { opacity: 0; transition: opacity .3s ease; } /* fades in over the poster once WebGL is drawing */
 .section-feature-defs { position: absolute; width: 0; height: 0; pointer-events: none; }
 /* Size, weight, tracking, case and colour come from the panel (inline); 39px / 600 / #8e8e8e are the Figma values. */
-.section-feature-word p { margin: 0; color: #8e8e8e; font-size: var(--type-size, 39px); font-weight: 600; line-height: 1.0513; letter-spacing: 0; text-align: center; white-space: pre; min-height: 1.0513em; }
+.section-feature-word p { position: relative; margin: 0; color: #8e8e8e; font-size: var(--type-size, 39px); font-weight: 600; line-height: 1.0513; letter-spacing: 0; text-align: center; white-space: pre; min-height: 1.0513em; }
 .section-feature-hud { position: absolute; left: 20px; bottom: 20px; font: 11px/1 var(--font-geist-mono), monospace; text-transform: uppercase; letter-spacing: 0.12em; color: #8e8e8e; opacity: 0.6; white-space: pre; pointer-events: none; }
 @media (max-width: 700px) {
   .section-feature-word p { font-size: min(var(--type-size, 39px), max(26px, 8vw)); }
