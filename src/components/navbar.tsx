@@ -100,6 +100,17 @@ export function Navbar({ children }: { children: ReactNode }) {
     // card's last pixel also hands off to the next section (the browser may scroll before or after this runs),
     // and stopping at the very bottom would leave the next card half-open.
     const seen = { el: null as HTMLElement | null, top: 0 }
+    // One gesture = a run of wheel events with gaps under GESTURE_GAP ms (momentum included), or one touch.
+    // Leaving a section needs a fresh gesture: if this gesture has already scrolled the card, hitting the end
+    // does not carry on into the next section, however hard the flick. Pause, then scroll again to move on.
+    const GESTURE_GAP = 180
+    const gesture = { at: 0, scrolledCard: false }
+    /** Returns true when the event belongs to the card (scroll it, do not change section). */
+    const keepOnCard = (direction: 1 | -1, fresh: boolean) => {
+      if (fresh) gesture.scrolledCard = false
+      if (cardCanScroll(direction)) { gesture.scrolledCard = true; return true }
+      return gesture.scrolledCard
+    }
     /** True when the front card is taller than the screen and is still scrolling (or has room to) in this direction. */
     const cardCanScroll = (direction: 1 | -1) => {
       if (!engine.frontSettled()) return false
@@ -117,16 +128,19 @@ export function Navbar({ children }: { children: ReactNode }) {
       if (event.ctrlKey || ignored(event.target) || Math.abs(event.deltaY) < Math.abs(event.deltaX)) return
       // Normalize line/page wheel modes to pixels.
       const pixels = event.deltaY * (event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? window.innerHeight : 1)
-      if (cardCanScroll(pixels > 0 ? 1 : -1)) return
+      const now = performance.now()
+      const fresh = now - gesture.at > GESTURE_GAP
+      gesture.at = now
+      if (keepOnCard(pixels > 0 ? 1 : -1, fresh)) return
       engine.scrub(pixels / travel())
     }
-    const onTouchStart = (event: TouchEvent) => { touch.y = ignored(event.target) ? null : event.touches[0].clientY }
+    const onTouchStart = (event: TouchEvent) => { touch.y = ignored(event.target) ? null : event.touches[0].clientY; gesture.scrolledCard = false }
     const onTouchMove = (event: TouchEvent) => {
       if (touch.y === null) return
       const y = event.touches[0].clientY
       const delta = touch.y - y // finger moving up = scrolling down
       touch.y = y
-      if (cardCanScroll(delta > 0 ? 1 : -1)) return
+      if (keepOnCard(delta > 0 ? 1 : -1, false)) return
       engine.scrub(delta / travel())
     }
     window.addEventListener("wheel", onWheel, { passive: true })
