@@ -1,6 +1,5 @@
 "use client"
 
-import Link from "next/link"
 import { useEffect, useState } from "react"
 import { createCardEngine, type Card } from "./card-engine"
 import { loadCardSettings, useCardSettings } from "./card-settings"
@@ -8,9 +7,9 @@ import { SHORTCUT_KEYS } from "./shortcuts"
 
 /** Each section owns one card. */
 const sections = [
-  { id: "work", label: "Work", key: SHORTCUT_KEYS[0], title: "Selected work", body: "Placeholder copy. Projects, case studies and client names will live here once the portfolio is designed." },
-  { id: "studio", label: "Studio", key: SHORTCUT_KEYS[1], title: "The studio", body: "Placeholder copy. Who we are, how we work and what we believe in." },
-  { id: "contact", label: "Contact", key: SHORTCUT_KEYS[2], title: "Let's talk", body: "Placeholder copy. Email, socials and a short brief form will live here." },
+  { id: "about", label: "About", key: SHORTCUT_KEYS[0], title: "The studio", body: "Placeholder copy. Who we are, how we work and what we believe in." },
+  { id: "services", label: "Services", key: SHORTCUT_KEYS[2], title: "Our services", body: "Placeholder copy. Our services and capabilities will live here once this section is designed." },
+  { id: "work", label: "Work", key: SHORTCUT_KEYS[1], title: "Selected work", body: "Placeholder copy. Projects, case studies and client names will live here once the portfolio is designed." },
 ] as const
 
 type SectionId = (typeof sections)[number]["id"]
@@ -28,7 +27,7 @@ const SCROLL_TRAVEL = 0.8
  * - Scroll / swipe: scrubbed. Down pulls the next section's card in, up pushes
  *   the front card out; its position follows the gesture linearly, so you
  *   scroll normally until the card is fully visible. See card-engine.ts.
- * - Close, Esc or the wordmark clears the whole stack, top card first (70ms stagger).
+ * - Close, Esc or Home clears the whole stack, top card first (70ms stagger).
  *
  * A small rAF engine instead of ScrollTrigger: the page has no document scroll
  * to pin or scrub against, and button tweens must share the same positions.
@@ -113,14 +112,19 @@ export function Navbar() {
   return (
     <>
       <header className="site-nav">
-        <Link href="/" className="site-nav-brand" aria-label="Survivors, home" onClick={event => { if (engine.isActive()) { event.preventDefault(); engine.closeAll() } }}>Survivors</Link>
         <nav aria-label="Primary">
           <ul>
+            <li>
+              <button type="button" aria-current={!hasCards ? "page" : undefined} onClick={() => engine.closeAll()}><span>Home</span></button>
+            </li>
             {sections.map(s => (
               <li key={s.id}>
-                <button type="button" data-active={top?.id === s.id ? "true" : undefined} aria-disabled={locked || undefined} onClick={() => { if (!locked) engine.open(s.id) }}>{s.label}<kbd aria-hidden="true"><span>[{s.key.toUpperCase()}]</span></kbd></button>
+                <button type="button" aria-current={top?.id === s.id ? "page" : undefined} aria-keyshortcuts={s.key.toUpperCase()} aria-disabled={locked || undefined} onClick={() => { if (!locked) engine.open(s.id) }}><span>{s.label}</span></button>
               </li>
             ))}
+            <li>
+              <button type="button"><span>Contact</span></button>
+            </li>
           </ul>
         </nav>
       </header>
