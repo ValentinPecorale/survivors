@@ -22,6 +22,14 @@ const spaceGrotesk = Space_Grotesk({
 export const metadata: Metadata = {
   title: "Survivors",
   description: "Design studio",
+  // Black skull on transparent for light browser chrome, white skull on a black disc for dark; favicon.ico is the fallback.
+  icons: {
+    icon: [
+      { url: "/icons/skull-light-64.png", type: "image/png", sizes: "64x64", media: "(prefers-color-scheme: light)" },
+      { url: "/icons/skull-dark-64.png", type: "image/png", sizes: "64x64", media: "(prefers-color-scheme: dark)" },
+    ],
+    apple: "/icons/apple-touch-icon.png",
+  },
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
