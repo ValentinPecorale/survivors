@@ -19,6 +19,6 @@ export function SectionContent({ id }: { id: SectionId }) {
   const entry = content[id]
   return <section className="section-intro" aria-label={`${id} introduction`}>
     <h1>{entry.heading}</h1>
-    <div className="section-intro-text">{entry.text}</div>
+    <div className="section-intro-text"><p>{entry.text}</p>{/* 2-column grid: text lives in column 1, column 2 stays empty (Figma 15:146) */}</div>
   </section>
 }
