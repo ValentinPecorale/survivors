@@ -131,14 +131,20 @@ body {
 }
 .site-nav nav { margin: 0 auto; }
 .site-nav ul { display: flex; align-items: center; gap: 16px; list-style: none; margin: 0; padding: 0 16px; }
-.site-nav ul button { position: relative; display: flex; align-items: center; justify-content: center; font: inherit; font-size: 15px; font-weight: 400; line-height: normal; letter-spacing: 4.5px; text-transform: uppercase; white-space: nowrap; color: inherit; background: none; border: 0; padding: 0 8px; cursor: pointer; }
+.site-nav ul button { position: relative; display: flex; align-items: center; justify-content: center; gap: 8px; font: inherit; font-size: 15px; font-weight: 400; line-height: normal; letter-spacing: 4.5px; text-transform: uppercase; white-space: nowrap; color: inherit; background: none; border: 0; padding: 0 8px; cursor: pointer; }
+.site-nav ul button kbd { font: inherit; font-size: 11px; color: #8e8e8e; }
 /* Enlarge the hit area without enlarging the reference's compact highlight. */
 .site-nav ul button::before { content: ""; position: absolute; inset: -12px 0; }
 .site-nav ul button[aria-disabled="true"] { pointer-events: none; }
-.site-nav ul button:focus-visible, .site-nav ul button:active { background: #fff; color: #0a0a0a; text-decoration: underline; text-underline-position: from-font; }
+.site-nav ul button:is([aria-current="page"], :focus-visible, :active) { background: #fff; color: #0a0a0a; }
+.site-nav ul button:is([aria-current="page"], :focus-visible, :active) kbd { color: inherit; }
 .site-nav button:focus-visible { outline: 2px solid #fff; outline-offset: 4px; }
 @media (hover: hover) {
-  .site-nav ul button:hover { background: #fff; color: #0a0a0a; text-decoration: underline; text-underline-position: from-font; }
+  .site-nav ul button:hover { background: #fff; color: #0a0a0a; }
+  .site-nav ul button:hover kbd { color: inherit; }
+}
+@media (max-width: 900px) {
+  .site-nav ul button kbd { display: none; }
 }
 @keyframes site-nav-enter { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: none; } }
 
