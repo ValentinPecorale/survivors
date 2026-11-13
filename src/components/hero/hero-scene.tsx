@@ -4,7 +4,7 @@
 
 import { useShaderLabPostProcessingSource } from "@basementstudio/shader-lab"
 import { useAnimations, useGLTF } from "@react-three/drei"
-import { unlockAudio, updateAmbient, updateSteps, playHover, preloadHover } from "./sound"
+import { unlockAudio, updateAmbient, updateSteps, hoverMove, hoverStop, preloadHover } from "./sound"
 import { createPlantPicker } from "./plant-hover"
 import { Canvas, createPortal, useFrame, useThree } from "@react-three/fiber"
 import { useEffect, useLayoutEffect, useMemo, useRef } from "react"
@@ -162,36 +162,35 @@ function Plants({ settings, orbitTarget, subjectFrame }: { settings: ModelSettin
   useEffect(() => {
     if (!settings.hoverSound) return
     const picker = createPlantPicker(scene)
-    const heard = new Map<number, number>()
-    let current = -1, lastSound = 0, frame = 0
+    let frame = 0, speed = 0, lastX = 0, lastY = 0, lastT = 0
     let pending: { x: number; y: number } | null = null
+    // The sound belongs to cursor movement: nothing here runs unless the pointer moves, so a still cursor
+    // (even over a plant, even while trees animate past it) is silent; hoverMove's own timer releases it.
     const run = () => {
       frame = 0
       const at = pending; pending = null
       if (!at) return
       const hit = picker.pick(at.x, at.y, getState().camera)
-      if (!hit) { current = -1; return }
-      if (hit.id === current) return
-      current = hit.id
-      const now = performance.now()
-      // Entering a new plant sounds once; the same plant needs 600ms, and sweeping is capped at ~11 sounds/s.
-      if (now - lastSound < 90 || now - (heard.get(hit.id) ?? -1e9) < 600) return
-      heard.set(hit.id, now); lastSound = now
-      playHover(hoverTrack.current, hit.kind, hoverVolume.current, at.x * 0.6)
+      hoverMove(hoverTrack.current, hit?.kind ?? null, hoverVolume.current, at.x * 0.6, speed)
     }
     const move = (event: PointerEvent) => {
       if (event.pointerType === "touch") return
       const bounds = canvas.getBoundingClientRect()
       if (!bounds.width || !bounds.height) return
+      const dt = event.timeStamp - lastT
+      if (lastT && dt > 0 && dt < 200) speed = speed * 0.5 + Math.hypot(event.clientX - lastX, event.clientY - lastY) / dt * 1000 * 0.5
+      else speed = 0
+      lastX = event.clientX; lastY = event.clientY; lastT = event.timeStamp
       pending = { x: (event.clientX - bounds.left) / bounds.width * 2 - 1, y: 1 - (event.clientY - bounds.top) / bounds.height * 2 }
       if (!frame) frame = requestAnimationFrame(run)
     }
-    const leave = () => { current = -1; pending = null }
+    const leave = () => { pending = null; lastT = 0; hoverStop() }
     canvas.addEventListener("pointermove", move, { passive: true })
     canvas.addEventListener("pointerleave", leave)
     return () => {
       canvas.removeEventListener("pointermove", move); canvas.removeEventListener("pointerleave", leave)
       if (frame) cancelAnimationFrame(frame)
+      hoverStop()
       picker.dispose()
     }
   }, [scene, canvas, getState, settings.hoverSound])

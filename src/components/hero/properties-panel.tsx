@@ -188,7 +188,7 @@ export function PropertiesPanel({ ascii, model, onAscii, onModel, status }: Prop
             <Toggle label="Tiger footsteps" value={model.stepSound} onChange={v => { if (v) unlockAudio(); m("stepSound", v) }} />
             {mr("Footsteps volume", "stepVolume", 0, 1)}
             {mr("Footsteps sync · seconds", "stepOffset", -0.2, 0.2, 0.01)}
-            <p className="property-help">All sounds are off by default; browsers only allow audio after a click. The hover sound plays when the cursor enters a tree, plant or grass head (exact silhouette, not a box). Footsteps are retimed to the stride, so they follow Speed, Play and Seek (silent in ping-pong). Nudge sync if the thuds land early or late against the paws. Use Save as default to keep your levels.</p>
+            <p className="property-help">All sounds are off by default; browsers only allow audio after a click. The hover sound plays only while the cursor is moving over a tree, plant or grass head (exact silhouette, not a box) and follows cursor speed; hold still and it stops. Footsteps are retimed to the stride, so they follow Speed, Play and Seek (silent in ping-pong). Nudge sync if the thuds land early or late against the paws. Use Save as default to keep your levels.</p>
           </Group>
           <Group title="Environment material">
             <Select label="Material" value={model.material} options={[["original", "Original"], ["clay", "Clay"], ["normal", "Normals"]]} onChange={v => m("material", v)} />

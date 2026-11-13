@@ -199,21 +199,21 @@ export function playRustle(kind: keyof typeof RUSTLE, volume: number, pan: numbe
   }
 }
 
-// ─── Hover sound choice ────────────────────────────────────────────────────
-/** Selectable hover sounds. `url` ones are samples; the rest are synthesised. */
+// ─── Hover sound (plays only while the cursor is moving over a plant) ──────
+/** Selectable hover sounds. `url` ones are samples; the rest are synthesised. `avoid` is a stretch of the file never played. */
 export const HOVER_SOUNDS = {
-  digital: { label: "Soft digital process", url: "/audio/soft-digital-process.mp3" },
-  rustle: { label: "Leaf rustle (synth)", url: null },
+  digital: { label: "Soft digital process", url: "/audio/soft-digital-process.mp3", lift: 14, avoid: null },
+  laboratory: { label: "Futuristic laboratory", url: "/audio/futuristic-laboratory.mp3", lift: 14, avoid: [1.1, 1.35] }, // one loud transient at ~1.2s
+  rustle: { label: "Leaf rustle (synth)", url: null, lift: 1, avoid: null },
 } as const
 export type HoverSoundId = keyof typeof HOVER_SOUNDS
 
-/** The sample is a 3.4s texture at −27dB peak. Each hover plays a random slice of it, so lift it for the slider. */
-const SAMPLE_LIFT = 14
-const SLICE = {
-  ear: { rate: 1.3, length: 0.3 },    // grass: short and high
-  grove: { rate: 1.0, length: 0.45 }, // undergrowth: natural pitch
-  tree: { rate: 0.8, length: 0.65 },  // canopy: lower and longer
-} as const
+/** Pitch per kind of plant: grass high, undergrowth natural, trees low. */
+const HOVER_RATE = { ear: 1.3, grove: 1.0, tree: 0.8 } as const
+type HoverKind = keyof typeof HOVER_RATE
+const SEGMENT = 0.6 // seconds of sample per segment
+const OVERLAP = 0.1 // crossfade between segments
+const SILENCE_AFTER = 110 // ms without pointer movement before the sound releases
 
 /** Start fetching/decoding the chosen sample so the first hover is not silent. */
 export function preloadHover(id: string) {
@@ -221,27 +221,90 @@ export function preloadHover(id: string) {
   if (def?.url) load(def.url)
 }
 
-export function playHover(id: string, kind: keyof typeof SLICE, volume: number, pan: number) {
-  const def = HOVER_SOUNDS[id as HoverSoundId] ?? HOVER_SOUNDS.digital
-  if (!def.url) { playRustle(kind, volume, pan); return }
+type HoverVoice = { master: GainNode; panner: StereoPannerNode; nextAt: number; lastMove: number; timer: number; kind: HoverKind; buffer: AudioBuffer; avoid: readonly [number, number] | null }
+let hoverVoice: HoverVoice | null = null
+let lastRustle = 0
+
+function releaseHover() {
+  const c = ctx
+  if (!hoverVoice || !c) return
+  const voice = hoverVoice
+  hoverVoice = null
+  window.clearInterval(voice.timer)
+  voice.master.gain.cancelScheduledValues(c.currentTime)
+  voice.master.gain.setTargetAtTime(0.0001, c.currentTime, 0.04)
+  // Segments already scheduled finish silently behind the closed master gain; clean up after the longest one.
+  window.setTimeout(() => { voice.master.disconnect(); voice.panner.disconnect() }, (SEGMENT + OVERLAP) * 1000 + 300)
+}
+
+/** Random start offset in the file that keeps a segment clear of the avoid stretch. */
+function segmentOffset(duration: number, span: number, avoid: readonly [number, number] | null) {
+  const max = Math.max(0, duration - span - 0.05)
+  if (!avoid) return Math.random() * max
+  const before = Math.max(0, avoid[0] - span)
+  const after = Math.max(0, max - avoid[1])
+  if (before <= 0 && after <= 0) return Math.random() * max
+  return Math.random() * (before + after) < before ? Math.random() * before : avoid[1] + Math.random() * after
+}
+
+function scheduleSegments(c: AudioContext, voice: HoverVoice) {
+  const rate = HOVER_RATE[voice.kind]
+  const span = SEGMENT * rate
+  while (voice.nextAt < c.currentTime + 0.25) {
+    const start = Math.max(voice.nextAt, c.currentTime)
+    const source = c.createBufferSource()
+    const gain = c.createGain()
+    source.buffer = voice.buffer
+    source.playbackRate.value = rate * (0.97 + Math.random() * 0.06)
+    gain.gain.setValueAtTime(0.0001, start)
+    gain.gain.linearRampToValueAtTime(1, start + OVERLAP)
+    gain.gain.setValueAtTime(1, start + SEGMENT - OVERLAP)
+    gain.gain.linearRampToValueAtTime(0.0001, start + SEGMENT)
+    source.connect(gain).connect(voice.master)
+    source.start(start, segmentOffset(voice.buffer.duration, span, voice.avoid), span + 0.05)
+    voice.nextAt = start + SEGMENT - OVERLAP
+  }
+}
+
+/**
+ * Call on every pointer movement. `over` is the plant under the cursor (or null). The sound runs only while
+ * the pointer is moving over a plant: it fades in within ~30ms, follows cursor speed (slow = quiet,
+ * fast = full), and releases ~110ms after the pointer stops or leaves the plant.
+ * `speed` is cursor speed in px/s; `pan` is −1…1.
+ */
+export function hoverMove(id: string, over: HoverKind | null, volume: number, pan: number, speed: number) {
   const c = context()
-  if (!c || c.state !== "running" || volume <= 0) return
+  if (!c || c.state !== "running" || !over || volume <= 0) { releaseHover(); return }
+  const def = HOVER_SOUNDS[id as HoverSoundId] ?? HOVER_SOUNDS.digital
+  const now = performance.now()
+  if (!def.url) { // synthesised rustle: re-trigger its grains while moving
+    if (now - lastRustle > 140) { lastRustle = now; playRustle(over, volume, pan) }
+    return
+  }
   const buffer = load(def.url)
   if (!buffer) return
-  const s = SLICE[kind]
-  const rate = s.rate * (0.96 + Math.random() * 0.08)
-  const length = s.length * (0.85 + Math.random() * 0.3)           // seconds of output
-  const offset = Math.random() * Math.max(0, buffer.duration - length * rate - 0.05)
-  const t = c.currentTime
-  const source = c.createBufferSource()
-  const gain = c.createGain()
-  const out = c.createStereoPanner()
-  source.buffer = buffer; source.playbackRate.value = rate
-  out.pan.value = Math.max(-1, Math.min(1, pan))
-  const peak = volume * volume * SAMPLE_LIFT * (0.8 + Math.random() * 0.2)
-  gain.gain.setValueAtTime(0.0001, t)
-  gain.gain.exponentialRampToValueAtTime(peak, t + 0.03)           // 30ms attack: no click
-  gain.gain.exponentialRampToValueAtTime(0.0001, t + length)       // long tail
-  source.connect(gain).connect(out).connect(c.destination)
-  source.start(t, offset, length * rate + 0.05)
+  const level = volume * volume * def.lift * (0.3 + 0.7 * Math.min(1, speed / 900))
+  if (hoverVoice && hoverVoice.buffer !== buffer) releaseHover() // sound changed in the panel
+  if (!hoverVoice) {
+    const master = c.createGain()
+    const panner = c.createStereoPanner()
+    master.gain.value = 0.0001
+    master.connect(panner).connect(c.destination)
+    const voice: HoverVoice = { master, panner, nextAt: c.currentTime, lastMove: now, timer: 0, kind: over, buffer, avoid: def.avoid }
+    // Keeps segments coming between pointer events, and releases once the pointer has been still.
+    voice.timer = window.setInterval(() => {
+      if (performance.now() - voice.lastMove > SILENCE_AFTER) releaseHover()
+      else scheduleSegments(c, voice)
+    }, 80)
+    hoverVoice = voice
+  }
+  const voice = hoverVoice
+  voice.kind = over
+  voice.lastMove = now
+  voice.panner.pan.setTargetAtTime(Math.max(-1, Math.min(1, pan)), c.currentTime, 0.05)
+  voice.master.gain.setTargetAtTime(level, c.currentTime, 0.03)
+  scheduleSegments(c, voice)
 }
+
+/** Cursor left the scene or hover was switched off. */
+export function hoverStop() { releaseHover() }
