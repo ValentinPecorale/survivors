@@ -7,9 +7,9 @@ import { SHORTCUT_KEYS } from "./shortcuts"
 
 /** Each section owns one card. */
 const sections = [
-  { id: "about", label: "About", key: SHORTCUT_KEYS[0], title: "The studio", body: "Placeholder copy. Who we are, how we work and what we believe in." },
+  { id: "about", label: "About", key: SHORTCUT_KEYS[1], title: "The studio", body: "Placeholder copy. Who we are, how we work and what we believe in." },
   { id: "services", label: "Services", key: SHORTCUT_KEYS[2], title: "Our services", body: "Placeholder copy. Our services and capabilities will live here once this section is designed." },
-  { id: "work", label: "Work", key: SHORTCUT_KEYS[1], title: "Selected work", body: "Placeholder copy. Projects, case studies and client names will live here once the portfolio is designed." },
+  { id: "work", label: "Work", key: SHORTCUT_KEYS[3], title: "Selected work", body: "Placeholder copy. Projects, case studies and client names will live here once the portfolio is designed." },
 ] as const
 
 type SectionId = (typeof sections)[number]["id"]
@@ -64,6 +64,7 @@ export function Navbar() {
     const editable = (target: EventTarget | null) => target instanceof HTMLElement && (target.isContentEditable || /^(TEXTAREA|SELECT)$/.test(target.tagName) || (target instanceof HTMLInputElement && !/^(range|checkbox|radio|color|button)$/.test(target.type)))
     const down = (event: KeyboardEvent) => {
       if (event.repeat || event.ctrlKey || event.metaKey || event.altKey || editable(event.target)) return
+      if (event.key.toLowerCase() === SHORTCUT_KEYS[0]) { engine.closeAll(); return }
       const section = sections.find(s => s.key === event.key.toLowerCase())
       if (section) engine.open(section.id)
     }
@@ -115,15 +116,15 @@ export function Navbar() {
         <nav aria-label="Primary">
           <ul>
             <li>
-              <button type="button" aria-current={!hasCards ? "page" : undefined} onClick={() => engine.closeAll()}><span>Home</span></button>
+              <button type="button" aria-current={!hasCards ? "page" : undefined} aria-keyshortcuts={SHORTCUT_KEYS[0].toUpperCase()} onClick={() => engine.closeAll()}><span>Home</span><kbd aria-hidden="true">[{SHORTCUT_KEYS[0].toUpperCase()}]</kbd></button>
             </li>
             {sections.map(s => (
               <li key={s.id}>
-                <button type="button" aria-current={top?.id === s.id ? "page" : undefined} aria-keyshortcuts={s.key.toUpperCase()} aria-disabled={locked || undefined} onClick={() => { if (!locked) engine.open(s.id) }}><span>{s.label}</span></button>
+                <button type="button" aria-current={top?.id === s.id ? "page" : undefined} aria-keyshortcuts={s.key.toUpperCase()} aria-disabled={locked || undefined} onClick={() => { if (!locked) engine.open(s.id) }}><span>{s.label}</span><kbd aria-hidden="true">[{s.key.toUpperCase()}]</kbd></button>
               </li>
             ))}
             <li>
-              <button type="button"><span>Contact</span></button>
+              <button type="button" aria-keyshortcuts="Space"><span>Contact</span><kbd aria-hidden="true">[SPACE]</kbd></button>
             </li>
           </ul>
         </nav>
