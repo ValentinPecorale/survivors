@@ -1,5 +1,6 @@
 "use client"
 
+import { unlockStepSound } from "./step-sound"
 import { useId, useState, type CSSProperties, type ReactNode } from "react"
 import { saveDefaultSettings } from "./settings-preset"
 import { bezierEase, defaultCardSettings, easePresets, saveCardSettings, setCardSettings, useCardSettings, type Bezier, type CardSettings } from "../card-settings"
@@ -176,6 +177,12 @@ export function PropertiesPanel({ ascii, model, onAscii, onModel, status }: Prop
             <Select label="Repeat" value={model.repeat} options={[["loop", "Loop"], ["once", "Once"], ["pingpong", "Ping-pong"]]} onChange={v => m("repeat", v)} />
             {mr("Seek · seconds", "start", 0, 10.83)}
             <p className="property-help">Pause to hold a frame. Seek to move through the animation.</p>
+          </Group>
+          <Group title="Sound">
+            <Toggle label="Footsteps" value={model.stepSound} onChange={v => { if (v) unlockStepSound(); m("stepSound", v) }} />
+            {mr("Volume", "stepVolume", 0, 1)}
+            {mr("Sync offset · seconds", "stepOffset", -0.2, 0.2, 0.01)}
+            <p className="property-help">Synthesised thud on every stride, so it follows Speed, Play and Seek. Off by default; browsers only allow audio after a click. Nudge the offset if it lands early or late against the paws.</p>
           </Group>
           <Group title="Environment material">
             <Select label="Material" value={model.material} options={[["original", "Original"], ["clay", "Clay"], ["normal", "Normals"]]} onChange={v => m("material", v)} />
