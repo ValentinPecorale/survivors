@@ -20,7 +20,8 @@
     "next": "16.4.6",
     "react": "19.3.0",
     "react-dom": "19.3.0",
-    "three": "^0.185.1"
+    "three": "^0.185.1",
+    "three-mesh-bvh": "0.8.3"
   },
   "devDependencies": {
     "@tailwindcss/turbopack": "4.3.3",

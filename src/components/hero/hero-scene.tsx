@@ -4,7 +4,8 @@
 
 import { useShaderLabPostProcessingSource } from "@basementstudio/shader-lab"
 import { useAnimations, useGLTF } from "@react-three/drei"
-import { unlockAudio, updateAmbient, updateSteps } from "./sound"
+import { unlockAudio, updateAmbient, updateSteps, playRustle } from "./sound"
+import { createPlantPicker } from "./plant-hover"
 import { Canvas, createPortal, useFrame, useThree } from "@react-three/fiber"
 import { useEffect, useLayoutEffect, useMemo, useRef } from "react"
 import * as THREE from "three"
@@ -147,11 +148,51 @@ function Plants({ settings, orbitTarget, subjectFrame }: { settings: ModelSettin
   useEffect(() => { if (settings.spin === 0) spin.current = 0 }, [settings.spin])
   // A saved preset can start with sound on; browsers keep audio locked until the first gesture.
   useEffect(() => {
-    if (!settings.stepSound && !settings.ambientSound) return
+    if (!settings.stepSound && !settings.ambientSound && !settings.hoverSound) return
     const unlock = () => unlockAudio()
     window.addEventListener("pointerdown", unlock, { once: true }); window.addEventListener("keydown", unlock, { once: true })
     return () => { window.removeEventListener("pointerdown", unlock); window.removeEventListener("keydown", unlock) }
-  }, [settings.stepSound, settings.ambientSound])
+  }, [settings.stepSound, settings.ambientSound, settings.hoverSound])
+  // Plant hover rustle: one ray per animation frame at most, only while the pointer moves.
+  const getState = useThree(s => s.get)
+  const hoverVolume = useRef(settings.hoverVolume)
+  useEffect(() => { hoverVolume.current = settings.hoverVolume }, [settings.hoverVolume])
+  useEffect(() => {
+    if (!settings.hoverSound) return
+    const picker = createPlantPicker(scene)
+    const heard = new Map<number, number>()
+    let current = -1, lastSound = 0, frame = 0
+    let pending: { x: number; y: number } | null = null
+    const run = () => {
+      frame = 0
+      const at = pending; pending = null
+      if (!at) return
+      const hit = picker.pick(at.x, at.y, getState().camera)
+      if (!hit) { current = -1; return }
+      if (hit.id === current) return
+      current = hit.id
+      const now = performance.now()
+      // Entering a new plant sounds once; the same plant needs 600ms, and sweeping is capped at ~11 sounds/s.
+      if (now - lastSound < 90 || now - (heard.get(hit.id) ?? -1e9) < 600) return
+      heard.set(hit.id, now); lastSound = now
+      playRustle(hit.kind, hoverVolume.current, at.x * 0.6)
+    }
+    const move = (event: PointerEvent) => {
+      if (event.pointerType === "touch") return
+      const bounds = canvas.getBoundingClientRect()
+      if (!bounds.width || !bounds.height) return
+      pending = { x: (event.clientX - bounds.left) / bounds.width * 2 - 1, y: 1 - (event.clientY - bounds.top) / bounds.height * 2 }
+      if (!frame) frame = requestAnimationFrame(run)
+    }
+    const leave = () => { current = -1; pending = null }
+    canvas.addEventListener("pointermove", move, { passive: true })
+    canvas.addEventListener("pointerleave", leave)
+    return () => {
+      canvas.removeEventListener("pointermove", move); canvas.removeEventListener("pointerleave", leave)
+      if (frame) cancelAnimationFrame(frame)
+      picker.dispose()
+    }
+  }, [scene, canvas, getState, settings.hoverSound])
   useEffect(() => {
     updateAmbient(settings.ambientSound, settings.ambientVolume, settings.ambientTrack)
     // Re-poll while enabled: picks up the file once decoded, or the context once unlocked.

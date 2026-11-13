@@ -29,6 +29,7 @@ export const defaultModel = {
   tigerVisible: true, tigerScale: 1, tigerX: 0, tigerY: 0, tigerZ: 0, tigerRotation: 0,
   playing: true, speed: 1, repeat: "loop", start: 0,
   stepSound: false, stepVolume: 0.5, stepOffset: 0,
+  hoverSound: false, hoverVolume: 0.5,
   ambientSound: false, ambientVolume: 0.4, ambientTrack: "cowboy",
   rotationX: 0, rotationY: 0, rotationZ: 0,
   positionX: 0, positionY: 0, positionZ: 0, scale: 1, spin: 0,

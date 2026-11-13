@@ -151,3 +151,50 @@ export function updateSteps(o: { enabled: boolean; playing: boolean; volume: num
   if (Math.abs(run.rate - rate) > 1e-3) { run.source.playbackRate.setTargetAtTime(rate, now, 0.03); run.rate = rate }
   run.gain.gain.setTargetAtTime(level, now, 0.05)
 }
+
+// ─── Plant hover rustle ────────────────────────────────────────────────────
+let rustleNoise: AudioBuffer | null = null
+
+const RUSTLE = {
+  // centre frequency of the band, Q, grain length (s), number of crackle grains
+  ear: { freq: 5400, q: 0.9, length: 0.14, grains: 3, gain: 0.7 },   // grass heads: light, high swish
+  grove: { freq: 3300, q: 0.7, length: 0.2, grains: 4, gain: 0.9 },  // undergrowth: leafy crackle
+  tree: { freq: 1700, q: 0.6, length: 0.3, grains: 4, gain: 1.0 },   // canopy: lower, longer
+} as const
+
+/**
+ * Synthesised leaf rustle: a few overlapping bandpassed noise grains with random timing, level and pitch, so
+ * no two hovers sound alike. `pan` is −1…1 (where the plant is on screen).
+ */
+export function playRustle(kind: keyof typeof RUSTLE, volume: number, pan: number) {
+  const c = context()
+  if (!c || c.state !== "running" || volume <= 0) return
+  if (!rustleNoise) {
+    rustleNoise = c.createBuffer(1, c.sampleRate, c.sampleRate)
+    const data = rustleNoise.getChannelData(0)
+    for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1
+  }
+  const r = RUSTLE[kind]
+  const t = c.currentTime
+  const out = c.createStereoPanner()
+  out.pan.value = Math.max(-1, Math.min(1, pan))
+  out.connect(c.destination)
+  for (let i = 0; i < r.grains; i++) {
+    const start = t + i * (r.length * 0.45) + Math.random() * 0.02
+    const length = r.length * (0.7 + Math.random() * 0.6)
+    const source = c.createBufferSource()
+    const band = c.createBiquadFilter()
+    const gain = c.createGain()
+    source.buffer = rustleNoise
+    band.type = "bandpass"
+    band.Q.value = r.q
+    band.frequency.setValueAtTime(r.freq * (0.85 + Math.random() * 0.3), start)
+    band.frequency.exponentialRampToValueAtTime(r.freq * 0.7, start + length)
+    const peak = volume * volume * r.gain * (0.5 + Math.random() * 0.5) * 1.4
+    gain.gain.setValueAtTime(0.0001, start)
+    gain.gain.exponentialRampToValueAtTime(peak, start + length * 0.2)
+    gain.gain.exponentialRampToValueAtTime(0.0001, start + length)
+    source.connect(band).connect(gain).connect(out)
+    source.start(start, Math.random() * 0.6, length + 0.05)
+  }
+}
