@@ -95,11 +95,25 @@ export function Navbar({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const touch = { y: null as number | null }
-    // Last scroll position seen on the front card. If the card has moved since the previous gesture event, that
-    // scroll was the card's own, so this event is swallowed too. Without it, the notch that lands exactly on the
-    // card's last pixel also hands off to the next section (the browser may scroll before or after this runs),
-    // and stopping at the very bottom would leave the next card half-open.
-    const seen = { el: null as HTMLElement | null, top: 0 }
+    // A section taller than the screen is a scroll container. Passing on to the next section is forbidden until
+    // its content has been scrolled to the end, and then only after resting there for END_DWELL ms.
+    // "Reached" (target = 1), not "settled": a card takes ~0.7s to glide in, and in that window a quick wheel
+    // notch used to skip the section's content and open the next section behind it.
+    const END_DWELL = 350
+    const seen = { el: null as HTMLElement | null, top: 0, movedAt: 0 }
+    /** True when the front card is taller than the screen and is still scrolling, has room to, or has not rested at its end yet. */
+    const cardCanScroll = (direction: 1 | -1) => {
+      if (!engine.frontReached()) return false
+      const front = Array.from(document.querySelectorAll<HTMLElement>(".site-card:not([data-closing])")).pop()
+      if (!front || front.scrollHeight <= front.clientHeight + 1) return false
+      if (seen.el !== front) { seen.el = front; seen.top = front.scrollTop; seen.movedAt = 0 }
+      const now = performance.now()
+      // The browser may scroll before or after this runs; either way, a changed scrollTop means the card moved.
+      if (front.scrollTop !== seen.top) { seen.top = front.scrollTop; seen.movedAt = now; return true }
+      const room = direction > 0 ? front.scrollTop + front.clientHeight < front.scrollHeight - 1 : front.scrollTop > 0
+      if (room) { seen.movedAt = now; return true }
+      return now - seen.movedAt < END_DWELL
+    }
     // One gesture = a run of wheel events with gaps under GESTURE_GAP ms (momentum included), or one touch.
     // Leaving a section needs a fresh gesture: if this gesture has already scrolled the card, hitting the end
     // does not carry on into the next section, however hard the flick. Pause, then scroll again to move on.
@@ -112,16 +126,6 @@ export function Navbar({ children }: { children: ReactNode }) {
       // A section is its whole vertical stack of frames. Once this gesture has scrolled it to its end, or has
       // brought a section into place (opened or closed one) and that has settled, the gesture is spent.
       return gesture.scrolledCard || (gesture.advanced && engine.frontReached())
-    }
-    /** True when the front card is taller than the screen and is still scrolling (or has room to) in this direction. */
-    const cardCanScroll = (direction: 1 | -1) => {
-      if (!engine.frontSettled()) return false
-      const front = Array.from(document.querySelectorAll<HTMLElement>(".site-card:not([data-closing])")).pop()
-      if (!front || front.scrollHeight <= front.clientHeight + 1) return false
-      const moved = seen.el === front && front.scrollTop !== seen.top
-      seen.el = front; seen.top = front.scrollTop
-      if (moved) return true
-      return direction > 0 ? front.scrollTop + front.clientHeight < front.scrollHeight - 1 : front.scrollTop > 0
     }
     const ignored = (target: EventTarget | null) => target instanceof Element && !!target.closest(".properties-panel, .properties-launcher, input, select, textarea")
     const travel = () => window.innerHeight * SCROLL_TRAVEL
