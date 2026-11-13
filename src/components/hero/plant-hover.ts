@@ -3,11 +3,19 @@ import { MeshBVH, acceleratedRaycast } from "three-mesh-bvh"
 
 export type PlantKind = "ear" | "grove" | "tree"
 
+/** Vertex count → what the plant is (plants.glb has exactly these four shapes besides the 42-vertex dust quads). */
+function kindOf(vertices: number): PlantKind | null {
+  if (vertices === 51223) return "ear"     // grass heads
+  if (vertices === 4606) return "grove"    // undergrowth
+  if (vertices === 44477 || vertices === 126621) return "tree"
+  return vertices > 1000 ? "grove" : null  // unknown larger mesh from a future export: still hoverable, never the dust quads
+}
+
 /**
  * Triangle-accurate hover for the plants GLB without paying for it every frame.
  *
- * plants.glb is 3.07M triangles in 103 animated instances, but only 3 unique geometries. A BVH per geometry
- * (≈60ms once on desktop, built when hover sound is first switched on) makes one cursor ray ≈0.05ms, so it is
+ * plants.glb is 3.07M triangles in 126 animated instances, but only 4 unique geometries. A BVH per geometry
+ * (≈100ms once on desktop, built when hover sound is first switched on) makes one cursor ray ≈0.05ms, so it is
  * run only on pointer movement, never in the render loop. Meshes keep their own world matrices, so the
  * animation moves them under the cursor and the ray still hits the right instance.
  */
@@ -17,10 +25,11 @@ export function createPlantPicker(root: THREE.Object3D) {
   root.traverse(object => {
     if (!(object instanceof THREE.Mesh)) return
     const material = Array.isArray(object.material) ? object.material[0] : object.material
-    const name = material?.name ?? ""
-    // Material names come from the Blender export: Haze_Ear_* (grass heads), Haze_Grove_* (undergrowth), Haze_Tree_*.
-    // Dust puffs and the ground are deliberately left out.
-    const kind: PlantKind | null = name.startsWith("Haze_Ear") ? "ear" : name.startsWith("Haze_Grove") ? "grove" : name.startsWith("Haze_Tree") ? "tree" : null
+    if (material?.name?.startsWith("Dust")) return // dust puffs are not plants
+    // Classify by geometry, not material name: the export gives some of the plants generic material names
+    // ("material", "material.001", "Material_0.002") that share geometry with the Haze_* ones, and those are
+    // exactly the plants near the tiger that stay in frame from the top-down camera.
+    const kind = kindOf(object.geometry.attributes.position.count)
     if (!kind) return
     kinds.set(object, kind)
     geometries.add(object.geometry)
