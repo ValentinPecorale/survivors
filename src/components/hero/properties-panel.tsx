@@ -1,6 +1,6 @@
 "use client"
 
-import { unlockAudio } from "./sound"
+import { TRACKS, unlockAudio } from "./sound"
 import { useId, useState, type CSSProperties, type ReactNode } from "react"
 import { saveDefaultSettings } from "./settings-preset"
 import { bezierEase, defaultCardSettings, easePresets, saveCardSettings, setCardSettings, useCardSettings, type Bezier, type CardSettings } from "../card-settings"
@@ -179,8 +179,9 @@ export function PropertiesPanel({ ascii, model, onAscii, onModel, status }: Prop
             <p className="property-help">Pause to hold a frame. Seek to move through the animation.</p>
           </Group>
           <Group title="Sound">
-            <Toggle label="Ambience · sea cave" value={model.ambientSound} onChange={v => { if (v) unlockAudio(); m("ambientSound", v) }} />
-            {mr("Ambience volume", "ambientVolume", 0, 1)}
+            <Toggle label="Music" value={model.ambientSound} onChange={v => { if (v) unlockAudio(); m("ambientSound", v) }} />
+            <Select label="Song" value={model.ambientTrack} options={Object.entries(TRACKS).map(([id, t]) => [id, t.label] as [string, string])} onChange={v => m("ambientTrack", v)} />
+            {mr("Music volume", "ambientVolume", 0, 1)}
             <Toggle label="Tiger footsteps" value={model.stepSound} onChange={v => { if (v) unlockAudio(); m("stepSound", v) }} />
             {mr("Footsteps volume", "stepVolume", 0, 1)}
             {mr("Footsteps sync · seconds", "stepOffset", -0.2, 0.2, 0.01)}

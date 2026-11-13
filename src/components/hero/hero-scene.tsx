@@ -153,11 +153,11 @@ function Plants({ settings, orbitTarget, subjectFrame }: { settings: ModelSettin
     return () => { window.removeEventListener("pointerdown", unlock); window.removeEventListener("keydown", unlock) }
   }, [settings.stepSound, settings.ambientSound])
   useEffect(() => {
-    updateAmbient(settings.ambientSound, settings.ambientVolume)
+    updateAmbient(settings.ambientSound, settings.ambientVolume, settings.ambientTrack)
     // Re-poll while enabled: picks up the file once decoded, or the context once unlocked.
-    const poll = settings.ambientSound ? window.setInterval(() => updateAmbient(true, settings.ambientVolume), 500) : 0
+    const poll = settings.ambientSound ? window.setInterval(() => updateAmbient(true, settings.ambientVolume, settings.ambientTrack), 500) : 0
     return () => { if (poll) window.clearInterval(poll) }
-  }, [settings.ambientSound, settings.ambientVolume])
+  }, [settings.ambientSound, settings.ambientVolume, settings.ambientTrack])
   useFrame((_, delta) => {
     // Recorded footsteps, phase-locked to the clip clock (see sound.ts). Ping-pong reverses time, so it stays silent there.
     updateSteps({ enabled: settings.stepSound && settings.repeat !== "pingpong", playing: settings.playing, volume: settings.stepVolume, speed: settings.speed, clipTime: clip?.time ?? 0, offset: settings.stepOffset })

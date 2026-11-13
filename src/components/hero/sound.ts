@@ -1,7 +1,7 @@
 /**
  * Two layers, both Web Audio (one shared AudioContext):
  *
- *  Ambient   – "night in the sea cave", 156s, plain loop with fades in/out.
+ *  Music     – selectable track (Sleepy cowboy / Night in the sea cave), plain loop with fades in/out.
  *  Footsteps – the recorded run, kept locked to the tiger's stride rather than free-running.
  *
  * Footstep sync: the recording has a strong beat every 0.5s (16 beats between 0.565s and 8.565s, so that
@@ -12,7 +12,12 @@
  */
 
 const FOOT_URL = "/audio/tiger-footsteps.mp3"
-const AMBIENT_URL = "/audio/sea-cave.mp3"
+/** Music tracks. `trim` evens out loudness between files so the volume slider means the same thing for each. */
+export const TRACKS = {
+  cowboy: { label: "Sleepy cowboy", url: "/audio/sleepy-cowboy.mp3", trim: 0.55 },
+  cave: { label: "Night in the sea cave", url: "/audio/sea-cave.mp3", trim: 1 },
+} as const
+export type TrackId = keyof typeof TRACKS
 
 export const STRIDE = 10.833333 / 20
 /** Strong beat in the recording: first at 0.565s, every 0.5s. Loop slice = 16 whole beats. */
@@ -57,14 +62,25 @@ function load(url: string): AudioBuffer | null {
 }
 
 // ─── Ambient ───────────────────────────────────────────────────────────────
-let ambient: { source: AudioBufferSourceNode; gain: GainNode } | null = null
+let ambient: { id: string; source: AudioBufferSourceNode; gain: GainNode } | null = null
 
-export function updateAmbient(enabled: boolean, volume: number) {
+function fadeOutAmbient(c: AudioContext) {
+  if (!ambient) return
+  const { source, gain } = ambient
+  ambient = null
+  gain.gain.cancelScheduledValues(c.currentTime)
+  gain.gain.setTargetAtTime(0.0001, c.currentTime, 0.4)
+  source.stop(c.currentTime + 2)
+}
+
+export function updateAmbient(enabled: boolean, volume: number, track: string) {
   const c = context()
   if (!c || c.state !== "running") return
+  const def = TRACKS[track as TrackId] ?? TRACKS.cowboy
   if (enabled && volume > 0) {
+    if (ambient && ambient.id !== def.url) fadeOutAmbient(c) // song changed: old one fades while the new one fades in
     if (!ambient) {
-      const buffer = load(AMBIENT_URL)
+      const buffer = load(def.url)
       if (!buffer) return
       const source = c.createBufferSource()
       const gain = c.createGain()
@@ -72,15 +88,10 @@ export function updateAmbient(enabled: boolean, volume: number) {
       gain.gain.value = 0.0001
       source.connect(gain).connect(c.destination)
       source.start()
-      ambient = { source, gain }
+      ambient = { id: def.url, source, gain }
     }
-    ambient.gain.gain.setTargetAtTime(volume * volume, c.currentTime, 0.5) // squared: the slider feels even in loudness
-  } else if (ambient) {
-    const { source, gain } = ambient
-    ambient = null
-    gain.gain.setTargetAtTime(0.0001, c.currentTime, 0.4)
-    source.stop(c.currentTime + 2)
-  }
+    ambient.gain.gain.setTargetAtTime(volume * volume * def.trim, c.currentTime, 0.5) // squared: the slider feels even in loudness
+  } else fadeOutAmbient(c)
 }
 
 // ─── Footsteps ─────────────────────────────────────────────────────────────
