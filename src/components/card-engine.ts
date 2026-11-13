@@ -247,6 +247,17 @@ export function createCardEngine<Id extends string>(order: readonly Id[], onChan
       kick()
     },
 
+    /**
+     * True when the front card has been driven fully open, even if it is still gliding there. This is the same
+     * test scrub() uses to decide it may spawn the next section, so the gesture guard in navbar.tsx can stop
+     * a single flick from opening a card and then immediately the one behind it.
+     */
+    frontReached() {
+      const top = front()
+      const m = top && motion.get(top.key)
+      return !!m && (m.target ?? m.p) >= 1
+    },
+
     /** True when the front card is fully covering the screen and at rest. */
     frontSettled() {
       const top = front()
