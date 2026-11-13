@@ -4,7 +4,7 @@
 
 import { useShaderLabPostProcessingSource } from "@basementstudio/shader-lab"
 import { useAnimations, useGLTF } from "@react-three/drei"
-import { unlockAudio, updateAmbient, updateSteps, playRustle } from "./sound"
+import { unlockAudio, updateAmbient, updateSteps, playHover, preloadHover } from "./sound"
 import { createPlantPicker } from "./plant-hover"
 import { Canvas, createPortal, useFrame, useThree } from "@react-three/fiber"
 import { useEffect, useLayoutEffect, useMemo, useRef } from "react"
@@ -156,7 +156,9 @@ function Plants({ settings, orbitTarget, subjectFrame }: { settings: ModelSettin
   // Plant hover rustle: one ray per animation frame at most, only while the pointer moves.
   const getState = useThree(s => s.get)
   const hoverVolume = useRef(settings.hoverVolume)
-  useEffect(() => { hoverVolume.current = settings.hoverVolume }, [settings.hoverVolume])
+  const hoverTrack = useRef(settings.hoverTrack)
+  useEffect(() => { hoverVolume.current = settings.hoverVolume; hoverTrack.current = settings.hoverTrack }, [settings.hoverVolume, settings.hoverTrack])
+  useEffect(() => { if (settings.hoverSound) preloadHover(settings.hoverTrack) }, [settings.hoverSound, settings.hoverTrack])
   useEffect(() => {
     if (!settings.hoverSound) return
     const picker = createPlantPicker(scene)
@@ -175,7 +177,7 @@ function Plants({ settings, orbitTarget, subjectFrame }: { settings: ModelSettin
       // Entering a new plant sounds once; the same plant needs 600ms, and sweeping is capped at ~11 sounds/s.
       if (now - lastSound < 90 || now - (heard.get(hit.id) ?? -1e9) < 600) return
       heard.set(hit.id, now); lastSound = now
-      playRustle(hit.kind, hoverVolume.current, at.x * 0.6)
+      playHover(hoverTrack.current, hit.kind, hoverVolume.current, at.x * 0.6)
     }
     const move = (event: PointerEvent) => {
       if (event.pointerType === "touch") return

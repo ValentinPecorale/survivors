@@ -198,3 +198,50 @@ export function playRustle(kind: keyof typeof RUSTLE, volume: number, pan: numbe
     source.start(start, Math.random() * 0.6, length + 0.05)
   }
 }
+
+// ─── Hover sound choice ────────────────────────────────────────────────────
+/** Selectable hover sounds. `url` ones are samples; the rest are synthesised. */
+export const HOVER_SOUNDS = {
+  digital: { label: "Soft digital process", url: "/audio/soft-digital-process.mp3" },
+  rustle: { label: "Leaf rustle (synth)", url: null },
+} as const
+export type HoverSoundId = keyof typeof HOVER_SOUNDS
+
+/** The sample is a 3.4s texture at −27dB peak. Each hover plays a random slice of it, so lift it for the slider. */
+const SAMPLE_LIFT = 14
+const SLICE = {
+  ear: { rate: 1.3, length: 0.3 },    // grass: short and high
+  grove: { rate: 1.0, length: 0.45 }, // undergrowth: natural pitch
+  tree: { rate: 0.8, length: 0.65 },  // canopy: lower and longer
+} as const
+
+/** Start fetching/decoding the chosen sample so the first hover is not silent. */
+export function preloadHover(id: string) {
+  const def = HOVER_SOUNDS[id as HoverSoundId]
+  if (def?.url) load(def.url)
+}
+
+export function playHover(id: string, kind: keyof typeof SLICE, volume: number, pan: number) {
+  const def = HOVER_SOUNDS[id as HoverSoundId] ?? HOVER_SOUNDS.digital
+  if (!def.url) { playRustle(kind, volume, pan); return }
+  const c = context()
+  if (!c || c.state !== "running" || volume <= 0) return
+  const buffer = load(def.url)
+  if (!buffer) return
+  const s = SLICE[kind]
+  const rate = s.rate * (0.96 + Math.random() * 0.08)
+  const length = s.length * (0.85 + Math.random() * 0.3)           // seconds of output
+  const offset = Math.random() * Math.max(0, buffer.duration - length * rate - 0.05)
+  const t = c.currentTime
+  const source = c.createBufferSource()
+  const gain = c.createGain()
+  const out = c.createStereoPanner()
+  source.buffer = buffer; source.playbackRate.value = rate
+  out.pan.value = Math.max(-1, Math.min(1, pan))
+  const peak = volume * volume * SAMPLE_LIFT * (0.8 + Math.random() * 0.2)
+  gain.gain.setValueAtTime(0.0001, t)
+  gain.gain.exponentialRampToValueAtTime(peak, t + 0.03)           // 30ms attack: no click
+  gain.gain.exponentialRampToValueAtTime(0.0001, t + length)       // long tail
+  source.connect(gain).connect(out).connect(c.destination)
+  source.start(t, offset, length * rate + 0.05)
+}

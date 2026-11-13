@@ -1,6 +1,6 @@
 "use client"
 
-import { TRACKS, unlockAudio } from "./sound"
+import { HOVER_SOUNDS, TRACKS, unlockAudio } from "./sound"
 import { useId, useState, type CSSProperties, type ReactNode } from "react"
 import { saveDefaultSettings } from "./settings-preset"
 import { bezierEase, defaultCardSettings, easePresets, saveCardSettings, setCardSettings, useCardSettings, type Bezier, type CardSettings } from "../card-settings"
@@ -182,12 +182,13 @@ export function PropertiesPanel({ ascii, model, onAscii, onModel, status }: Prop
             <Toggle label="Music" value={model.ambientSound} onChange={v => { if (v) unlockAudio(); m("ambientSound", v) }} />
             <Select label="Song" value={model.ambientTrack} options={Object.entries(TRACKS).map(([id, t]) => [id, t.label] as [string, string])} onChange={v => m("ambientTrack", v)} />
             {mr("Music volume", "ambientVolume", 0, 1)}
-            <Toggle label="Plant rustle · hover" value={model.hoverSound} onChange={v => { if (v) unlockAudio(); m("hoverSound", v) }} />
-            {mr("Rustle volume", "hoverVolume", 0, 1)}
+            <Toggle label="Plant hover sound" value={model.hoverSound} onChange={v => { if (v) unlockAudio(); m("hoverSound", v) }} />
+            <Select label="Hover sound" value={model.hoverTrack} options={Object.entries(HOVER_SOUNDS).map(([id, h]) => [id, h.label] as [string, string])} onChange={v => m("hoverTrack", v)} />
+            {mr("Hover volume", "hoverVolume", 0, 1)}
             <Toggle label="Tiger footsteps" value={model.stepSound} onChange={v => { if (v) unlockAudio(); m("stepSound", v) }} />
             {mr("Footsteps volume", "stepVolume", 0, 1)}
             {mr("Footsteps sync · seconds", "stepOffset", -0.2, 0.2, 0.01)}
-            <p className="property-help">All sounds are off by default; browsers only allow audio after a click. Rustle plays when the cursor enters a tree, plant or grass head (exact silhouette, not a box). Footsteps are retimed to the stride, so they follow Speed, Play and Seek (silent in ping-pong). Nudge sync if the thuds land early or late against the paws. Use Save as default to keep your levels.</p>
+            <p className="property-help">All sounds are off by default; browsers only allow audio after a click. The hover sound plays when the cursor enters a tree, plant or grass head (exact silhouette, not a box). Footsteps are retimed to the stride, so they follow Speed, Play and Seek (silent in ping-pong). Nudge sync if the thuds land early or late against the paws. Use Save as default to keep your levels.</p>
           </Group>
           <Group title="Environment material">
             <Select label="Material" value={model.material} options={[["original", "Original"], ["clay", "Clay"], ["normal", "Normals"]]} onChange={v => m("material", v)} />
