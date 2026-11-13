@@ -95,11 +95,19 @@ export function Navbar({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const touch = { y: null as number | null }
-    /** True when the front card is taller than the screen and still has content to scroll in this direction. */
+    // Last scroll position seen on the front card. If the card has moved since the previous gesture event, that
+    // scroll was the card's own, so this event is swallowed too. Without it, the notch that lands exactly on the
+    // card's last pixel also hands off to the next section (the browser may scroll before or after this runs),
+    // and stopping at the very bottom would leave the next card half-open.
+    const seen = { el: null as HTMLElement | null, top: 0 }
+    /** True when the front card is taller than the screen and is still scrolling (or has room to) in this direction. */
     const cardCanScroll = (direction: 1 | -1) => {
       if (!engine.frontSettled()) return false
       const front = Array.from(document.querySelectorAll<HTMLElement>(".site-card:not([data-closing])")).pop()
       if (!front || front.scrollHeight <= front.clientHeight + 1) return false
+      const moved = seen.el === front && front.scrollTop !== seen.top
+      seen.el = front; seen.top = front.scrollTop
+      if (moved) return true
       return direction > 0 ? front.scrollTop + front.clientHeight < front.scrollHeight - 1 : front.scrollTop > 0
     }
     const ignored = (target: EventTarget | null) => target instanceof Element && !!target.closest(".properties-panel, .properties-launcher, input, select, textarea")
