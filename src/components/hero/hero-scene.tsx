@@ -4,7 +4,7 @@
 
 import { useShaderLabPostProcessingSource } from "@basementstudio/shader-lab"
 import { useAnimations, useGLTF } from "@react-three/drei"
-import { unlockStepSound, playStep, STEP_FIRST, STEP_PERIOD, STEPS_PER_LOOP } from "./step-sound"
+import { unlockStepSound, playStep, PAWS, STEP_PERIOD, STEPS_PER_LOOP } from "./step-sound"
 import { Canvas, createPortal, useFrame, useThree } from "@react-three/fiber"
 import { useEffect, useLayoutEffect, useMemo, useRef } from "react"
 import * as THREE from "three"
@@ -145,7 +145,7 @@ function Plants({ settings, orbitTarget, subjectFrame }: { settings: ModelSettin
     return () => { originals.forEach((material, mesh) => { mesh.material = material }); created.forEach(material => material.dispose()) }
   }, [scene, settings.material, settings.wireframe])
   useEffect(() => { if (settings.spin === 0) spin.current = 0 }, [settings.spin])
-  const lastStep = useRef(-1)
+  const lastStep = useRef<number[]>([])
   // A saved preset can start with sound on; browsers keep audio locked until the first gesture.
   useEffect(() => {
     if (!settings.stepSound) return
@@ -154,14 +154,17 @@ function Plants({ settings, orbitTarget, subjectFrame }: { settings: ModelSettin
     return () => { window.removeEventListener("pointerdown", unlock); window.removeEventListener("keydown", unlock) }
   }, [settings.stepSound])
   useFrame((_, delta) => {
-    // Footstep: one thud per stride, locked to the clip clock so speed, pause and seek stay in sync.
-    // Only consecutive forward steps sound; seeking or ping-pong reversing stays silent.
+    // Footsteps: one thud per paw contact (4 per stride), locked to the clip clock so speed, pause and seek stay in sync.
+    // Only consecutive forward contacts sound; seeking or ping-pong reversing stays silent.
     if (settings.stepSound && settings.playing && clip) {
-      const index = Math.floor((clip.time - STEP_FIRST - settings.stepOffset) / STEP_PERIOD)
-      const wrapped = ((index % STEPS_PER_LOOP) + STEPS_PER_LOOP) % STEPS_PER_LOOP
-      if (lastStep.current >= 0 && wrapped !== lastStep.current && (wrapped - lastStep.current + STEPS_PER_LOOP) % STEPS_PER_LOOP === 1) playStep(settings.stepVolume)
-      lastStep.current = wrapped
-    } else lastStep.current = -1
+      PAWS.forEach((paw, i) => {
+        const index = Math.floor((clip.time - paw.phase - settings.stepOffset) / STEP_PERIOD)
+        const wrapped = ((index % STEPS_PER_LOOP) + STEPS_PER_LOOP) % STEPS_PER_LOOP
+        const last = lastStep.current[i] ?? -1
+        if (last >= 0 && wrapped !== last && (wrapped - last + STEPS_PER_LOOP) % STEPS_PER_LOOP === 1) playStep(settings.stepVolume, i)
+        lastStep.current[i] = wrapped
+      })
+    } else lastStep.current = []
     const state = cursor.current
     // Exponential damping reaches 95% of the target within the smoothing time.
     // Clamp delta so restoring a background tab cannot produce a large jump.
