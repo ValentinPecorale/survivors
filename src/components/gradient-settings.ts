@@ -23,6 +23,15 @@ export const defaultGradientSettings = {
   // Typewriter (About frame): every step of scroll is one keypress
   typeSensitivity: 80, // px of scroll per keypress
   typeBeat: 1,         // empty steps between deleting a word and typing the next
+  typeWords: "",       // one word or phrase per line; empty = the words from the About content (Keystatic)
+  typeReversible: true, // scrolling back undoes keypresses (off: once typed, it stays)
+  typeSize: 39,        // px
+  typeWeight: 600,
+  typeTracking: 0,     // em × 100
+  typeCase: "none" as "none" | "uppercase" | "lowercase",
+  typeColor: "#8e8e8e",
+  typeBg: "#0a0a0a",
+  typeHud: false,      // small step counter in the corner, for tuning
   // Inner shadow on the word (SVG filter: inverted alpha, offset, blurred, clipped to the glyphs)
   shadowEnabled: true,
   shadowColor: "#000000",
@@ -65,6 +74,15 @@ export function loadGradientSettings() {
       softness: num(s.softness, d.softness, 0, 1),
       typeSensitivity: num(s.typeSensitivity, d.typeSensitivity, 20, 200),
       typeBeat: Math.round(num(s.typeBeat, d.typeBeat, 0, 6)),
+      typeWords: typeof s.typeWords === "string" ? s.typeWords.slice(0, 600) : d.typeWords,
+      typeReversible: typeof s.typeReversible === "boolean" ? s.typeReversible : d.typeReversible,
+      typeSize: num(s.typeSize, d.typeSize, 16, 120),
+      typeWeight: num(s.typeWeight, d.typeWeight, 100, 900),
+      typeTracking: num(s.typeTracking, d.typeTracking, -10, 10),
+      typeCase: s.typeCase === "uppercase" || s.typeCase === "lowercase" ? s.typeCase : "none",
+      typeColor: hex(s.typeColor, d.typeColor),
+      typeBg: hex(s.typeBg, d.typeBg),
+      typeHud: typeof s.typeHud === "boolean" ? s.typeHud : d.typeHud,
       shadowEnabled: typeof s.shadowEnabled === "boolean" ? s.shadowEnabled : d.shadowEnabled,
       shadowColor: hex(s.shadowColor, d.shadowColor),
       shadowOpacity: num(s.shadowOpacity, d.shadowOpacity, 0, 1),

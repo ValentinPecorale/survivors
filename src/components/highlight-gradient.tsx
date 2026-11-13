@@ -1,7 +1,7 @@
 "use client"
 
 import Image from "next/image"
-import { useEffect, useId, useMemo, useRef, useState, type RefObject } from "react"
+import { useEffect, useId, useMemo, useRef, useState, type CSSProperties, type RefObject } from "react"
 import { useGradientSettings, type GradientSettings } from "./gradient-settings"
 import { buildTimeline } from "./typewriter-timeline"
 
@@ -214,6 +214,9 @@ function MeshGradient({ settings, surface, box, idle }: { settings: GradientSett
   return <><canvas ref={posterRef} className="mesh-poster" /><canvas ref={canvasRef} className="mesh-canvas" /></>
 }
 
+/** One word or phrase per line, blanks dropped. */
+const parseWords = (text: string) => text.split("\n").map(w => w.trim()).filter(Boolean)
+
 /**
  * Figma 27:414, as a pinned typewriter. The frame sticks to the screen while the card scrolls, and every
  * `typeSensitivity` px of scroll is one keypress (see typewriter-timeline.ts): the current word is deleted
@@ -225,27 +228,33 @@ function MeshGradient({ settings, surface, box, idle }: { settings: GradientSett
  * text only (CSS has no inner shadow for text): it inverts the glyph alpha, offsets and blurs it, and keeps
  * only what falls inside the letters.
  */
-export function HighlightFrame({ id, words }: { id: string; words: readonly string[] }) {
+export function HighlightFrame({ id, words: contentWords }: { id: string; words: readonly string[] }) {
   const g = useGradientSettings()
   const uid = useId().replace(/:/g, "")
+  // The panel can override the words (one per line); empty means the About content.
+  const words = useMemo(() => { const custom = parseWords(g.typeWords); return custom.length ? custom : contentWords }, [g.typeWords, contentWords])
   const timeline = useMemo(() => buildTimeline(words, g.typeBeat), [words, g.typeBeat])
   const [step, setStep] = useState(0)
   const track = useRef<HTMLDivElement>(null)
   const frame = useRef<HTMLElement>(null)
   const box = useRef<HTMLSpanElement>(null)
   const idle = useRef(false)
-  const live = useRef({ total: timeline.total, sensitivity: g.typeSensitivity })
+  const live = useRef({ total: timeline.total, sensitivity: g.typeSensitivity, reversible: g.typeReversible })
+  const peak = useRef(0) // furthest step reached, for "not reversible"
   const apply = useRef<() => void>(() => {})
 
   // Scroll position → keypress count. Native scrolling: no input is captured, the card keeps its own scroll.
-  useEffect(() => { live.current = { total: timeline.total, sensitivity: g.typeSensitivity }; apply.current() }, [timeline.total, g.typeSensitivity])
+  useEffect(() => { peak.current = 0 }, [timeline])
+  useEffect(() => { live.current = { total: timeline.total, sensitivity: g.typeSensitivity, reversible: g.typeReversible }; apply.current() }, [timeline.total, g.typeSensitivity, g.typeReversible])
   useEffect(() => {
     const trackEl = track.current
     const scroller = trackEl?.closest<HTMLElement>(".site-card")
     if (!trackEl || !scroller) return
     const run = () => {
-      const { total, sensitivity } = live.current
-      const next = Math.min(total, Math.max(0, Math.floor((scroller.scrollTop - trackEl.offsetTop) / sensitivity)))
+      const { total, sensitivity, reversible } = live.current
+      let next = Math.min(total, Math.max(0, Math.floor((scroller.scrollTop - trackEl.offsetTop) / sensitivity)))
+      if (!reversible) next = Math.max(next, peak.current)
+      peak.current = Math.max(peak.current, next)
       setStep(prev => prev === next ? prev : next)
     }
     apply.current = run
@@ -260,7 +269,7 @@ export function HighlightFrame({ id, words }: { id: string; words: readonly stri
 
   return (
     <div ref={track} className="section-feature-track" style={{ height: `calc(100svh + ${timeline.total * g.typeSensitivity}px)` }}>
-      <section ref={frame} className="section-feature" aria-label={`${id} highlight`}>
+      <section ref={frame} className="section-feature" aria-label={`${id} highlight`} style={{ background: g.typeBg, "--type-size": `${g.typeSize}px` } as CSSProperties}>
         <svg className="section-feature-defs" width="0" height="0" aria-hidden="true" focusable="false">
           <filter id={`${uid}-shadow`} colorInterpolationFilters="sRGB">
             <feComponentTransfer in="SourceAlpha" result="inverse"><feFuncA type="table" tableValues="1 0" /></feComponentTransfer>
@@ -280,8 +289,9 @@ export function HighlightFrame({ id, words }: { id: string; words: readonly stri
               <MeshGradient settings={g} surface={frame} box={box} idle={idle} />
             </span>
           </div>
-          <p style={{ filter: g.shadowEnabled ? `url(#${uid}-shadow)` : undefined }}>{state.text || "\u200b"}</p>
+          <p style={{ filter: g.shadowEnabled ? `url(#${uid}-shadow)` : undefined, color: g.typeColor, fontWeight: g.typeWeight, letterSpacing: `${g.typeTracking / 100}em`, textTransform: g.typeCase }}>{state.text || "\u200b"}</p>
         </div>
+        {g.typeHud && <div className="section-feature-hud" aria-hidden="true">{String(step).padStart(3, "0")} / {String(timeline.total).padStart(3, "0")}  {state.phase}</div>}
       </section>
     </div>
   )

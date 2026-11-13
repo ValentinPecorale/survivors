@@ -1,9 +1,10 @@
 "use client"
 
+import about from "@/content/sections/about.json"
 import { HOVER_SOUNDS, TRACKS, unlockAudio } from "./sound"
 import { useId, useState, type CSSProperties, type ReactNode } from "react"
 import { saveDefaultSettings } from "./settings-preset"
-import { defaultGradientSettings, saveGradientSettings, setGradientSettings, useGradientSettings, type GradientSettings } from "../gradient-settings"
+import { defaultGradientSettings, getGradientSettings, saveGradientSettings, setGradientSettings, useGradientSettings, type GradientSettings } from "../gradient-settings"
 import { bezierEase, defaultCardSettings, easePresets, saveCardSettings, setCardSettings, useCardSettings, type Bezier, type CardSettings } from "../card-settings"
 import { defaultAscii, defaultModel, defaultCamera, defaultText, type AsciiSettings, type ModelSettings } from "./live-settings"
 
@@ -90,7 +91,7 @@ export function PropertiesPanel({ ascii, model, onAscii, onModel, status }: Prop
   const [saveStatus, setSaveStatus] = useState("")
   const cards = useCardSettings()
   const gradient = useGradientSettings()
-  const gr = <K extends keyof GradientSettings>(key: K, value: GradientSettings[K]) => setGradientSettings({ ...gradient, [key]: value })
+  const gr = <K extends keyof GradientSettings>(key: K, value: GradientSettings[K]) => setGradientSettings({ ...getGradientSettings(), [key]: value }) // current store value, not the last render: quick successive edits must not overwrite each other
   const c = <K extends keyof CardSettings>(key: K, value: CardSettings[K]) => setCardSettings({ ...cards, [key]: value })
   const a = <K extends keyof AsciiSettings>(key: K, value: AsciiSettings[K]) => onAscii({ ...ascii, [key]: value })
   const m = <K extends keyof ModelSettings>(key: K, value: ModelSettings[K]) => onModel({ ...model, [key]: value })
@@ -248,9 +249,22 @@ export function PropertiesPanel({ ascii, model, onAscii, onModel, status }: Prop
       </> : tab === "gradient" ? <>
         <div className="property-card">
           <Group title="Typewriter">
+            <label className="property-custom">Words · one per line<textarea aria-label="Words" rows={5} spellCheck={false} value={gradient.typeWords || about.words.join("\n")} onChange={e => gr("typeWords", e.target.value)} /></label>
+            <p className="property-help">Empty (or cleared) uses the words from the About content in Keystatic. Edits here are live and kept by Save as default. The last word, fully typed, is the end of the section.</p>
             <Range label="Scroll per keypress · px" value={gradient.typeSensitivity} min={20} max={200} step={5} onChange={v => gr("typeSensitivity", v)} />
             <Range label="Pause between words · steps" value={gradient.typeBeat} min={0} max={6} step={1} onChange={v => gr("typeBeat", v)} />
-            <p className="property-help">The frame stays pinned and every step of scroll is one keypress: the word is deleted letter by letter, then the next is typed. Scrolling back undoes it. The last word fully typed is the end of the section. The gradient hugs the text as it changes.</p>
+            <Toggle label="Reversible" value={gradient.typeReversible} onChange={v => gr("typeReversible", v)} />
+            <Toggle label="Step counter" value={gradient.typeHud} onChange={v => gr("typeHud", v)} />
+            <p className="property-help">The frame stays pinned and every step of scroll is one keypress: the word is deleted letter by letter, then the next is typed. Reversible: scrolling back undoes the keypresses; off, typed text stays. The gradient hugs the text as it changes.</p>
+          </Group>
+          <Group title="Type">
+            <Range label="Letter size · px" value={gradient.typeSize} min={16} max={120} step={1} onChange={v => gr("typeSize", v)} />
+            <Range label="Weight" value={gradient.typeWeight} min={100} max={900} step={50} onChange={v => gr("typeWeight", v)} />
+            <Range label="Tracking · em × 100" value={gradient.typeTracking} min={-10} max={10} step={0.5} onChange={v => gr("typeTracking", v)} />
+            <Select label="Case" value={gradient.typeCase} options={[["none", "As typed"], ["uppercase", "UPPERCASE"], ["lowercase", "lowercase"]]} onChange={v => gr("typeCase", v as GradientSettings["typeCase"])} />
+            <Color label="Text color" value={gradient.typeColor} onChange={v => gr("typeColor", v)} />
+            <Color label="Frame background" value={gradient.typeBg} onChange={v => gr("typeBg", v)} />
+            <p className="property-help">Font stays Geist. The gradient and the inner shadow follow the text size.</p>
           </Group>
           <Group title="Palette">
             <Color label="Cursor light" value={gradient.highlight} onChange={v => gr("highlight", v)} />
