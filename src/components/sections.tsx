@@ -1,4 +1,4 @@
-import Image from "next/image"
+import { HighlightFrame } from "./highlight-gradient"
 import { SHORTCUT_KEYS } from "./shortcuts"
 import about from "@/content/sections/about.json"
 import services from "@/content/sections/services.json"
@@ -24,14 +24,6 @@ export function SectionContent({ id }: { id: SectionId }) {
       <h1>{entry.heading}</h1>
       <div className="section-intro-text"><p>{entry.text}</p>{/* 2-column grid: text lives in column 1, column 2 stays empty (Figma 15:146) */}</div>
     </section>
-    {"highlight" in entry && entry.highlight && (
-      // Figma 27:414 — one centred word over a chrome gradient that bleeds past the text on every side.
-      <section className="section-feature" aria-label={`${id} highlight`}>
-        <div className="section-feature-word">
-          <span className="section-feature-bg" aria-hidden="true"><Image src="/images/about-websites.webp" alt="" fill sizes="240px" /></span>
-          <p>{entry.highlight}</p>
-        </div>
-      </section>
-    )}
+    {"highlight" in entry && entry.highlight && <HighlightFrame id={id} text={entry.highlight} />}
   </>
 }

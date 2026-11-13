@@ -6,6 +6,7 @@ import { usePathname, useRouter } from "next/navigation"
 import { sections, sectionFromPath, SectionContent, type SectionId } from "./sections"
 import { createCardEngine } from "./card-engine"
 import { loadCardSettings, sectionAudio, useCardSettings } from "./card-settings"
+import { loadGradientSettings } from "./gradient-settings"
 import { SHORTCUT_KEYS } from "./shortcuts"
 
 /** Scroll distance for one full slide, as a fraction of viewport height. 1:1 and linear. */
@@ -58,7 +59,7 @@ export function Navbar({ children }: { children: ReactNode }) {
   useEffect(() => () => engine.destroy(), [engine])
 
   const { openMs, openDelayMs } = useCardSettings()
-  useEffect(() => { loadCardSettings() }, [])
+  useEffect(() => { loadCardSettings(); loadGradientSettings() }, [])
   const locked = cards.some(c => c.entering)
   // Safety net: if the browser never reports animation frames (hidden tab), unlock after the slide should have finished.
   useEffect(() => {

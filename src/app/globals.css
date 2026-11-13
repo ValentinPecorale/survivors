@@ -22,7 +22,7 @@ body {
   --panel-text: #ededeb;
   --panel-muted: #888887;
   position: absolute;
-  z-index: 10;
+  z-index: 99; /* above the section cards (z 15+) so it stays usable in every section; the nav (z 100) stays on top */
   right: 20px;
   top: 76px;
   color: var(--panel-text);
@@ -47,7 +47,7 @@ body {
 .properties-live { margin-left: auto; display: flex; align-items: center; gap: 5px; color: #92928e; font-size: 9px; }
 .properties-live i { width: 4px; height: 4px; background: #c7c9bd; border-radius: 50%; }
 .properties-header > button { font-size: 18px; color: #989898; width: 22px; height: 24px; cursor: pointer; }
-.properties-tabs { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); padding: 8px; gap: 2px; border-bottom: 1px solid #ffffff0d; }
+.properties-tabs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); padding: 8px; gap: 2px; border-bottom: 1px solid #ffffff0d; }
 .properties-tabs button { display: flex; align-items: center; justify-content: center; gap: 5px; padding: 9px 2px; border: 1px solid transparent; border-radius: 8px; color: #777; font-size: 10px; font-weight: 650; cursor: pointer; transition: background 160ms ease-out, color 160ms ease-out; }
 .properties-tabs button[aria-selected="true"] { color: #ededeb; background: #242425; border-color: #ffffff09; }
 .properties-tabs button span { font-size: 8px; border: 1px solid #ffffff12; color: #969695; padding: 1px 4px; border-radius: 10px; font-weight: 400; }
@@ -181,6 +181,9 @@ body {
 /* The image box is the text box grown by these percentages (Figma insets): top 12.2%, right 3.45%, bottom 14.63%, left 4.02%. */
 .section-feature-bg { position: absolute; inset: -12.2% -3.45% -14.63% -4.02%; pointer-events: none; }
 .section-feature-bg img { object-fit: cover; }
+.section-feature-bg canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.mesh-canvas { opacity: 0; transition: opacity .3s ease; } /* fades in over the poster once WebGL is drawing */
+.section-feature-defs { position: absolute; width: 0; height: 0; pointer-events: none; }
 .section-feature-word p { position: relative; margin: 0; color: #8e8e8e; font-size: 39px; font-weight: 600; line-height: 41px; letter-spacing: 0; text-align: center; white-space: nowrap; }
 @media (max-width: 700px) {
   .section-feature { padding: 20px; }

@@ -3,6 +3,7 @@
 import { HOVER_SOUNDS, TRACKS, unlockAudio } from "./sound"
 import { useId, useState, type CSSProperties, type ReactNode } from "react"
 import { saveDefaultSettings } from "./settings-preset"
+import { defaultGradientSettings, saveGradientSettings, setGradientSettings, useGradientSettings, type GradientSettings } from "../gradient-settings"
 import { bezierEase, defaultCardSettings, easePresets, saveCardSettings, setCardSettings, useCardSettings, type Bezier, type CardSettings } from "../card-settings"
 import { defaultAscii, defaultModel, defaultCamera, defaultText, type AsciiSettings, type ModelSettings } from "./live-settings"
 
@@ -84,10 +85,12 @@ function EaseEditor({ label, value, onChange }: { label: string; value: Bezier; 
 const options = (values: string[]) => values.map(value => [value, value.charAt(0).toUpperCase() + value.slice(1)] as [string, string])
 
 export function PropertiesPanel({ ascii, model, onAscii, onModel, status }: Props) {
-  const [tab, setTab] = useState<"ascii" | "model" | "camera" | "cards" | "text">("ascii")
+  const [tab, setTab] = useState<"ascii" | "model" | "camera" | "cards" | "text" | "gradient">("ascii")
   const [open, setOpen] = useState(true)
   const [saveStatus, setSaveStatus] = useState("")
   const cards = useCardSettings()
+  const gradient = useGradientSettings()
+  const gr = <K extends keyof GradientSettings>(key: K, value: GradientSettings[K]) => setGradientSettings({ ...gradient, [key]: value })
   const c = <K extends keyof CardSettings>(key: K, value: CardSettings[K]) => setCardSettings({ ...cards, [key]: value })
   const a = <K extends keyof AsciiSettings>(key: K, value: AsciiSettings[K]) => onAscii({ ...ascii, [key]: value })
   const m = <K extends keyof ModelSettings>(key: K, value: ModelSettings[K]) => onModel({ ...model, [key]: value })
@@ -103,6 +106,7 @@ export function PropertiesPanel({ ascii, model, onAscii, onModel, status }: Prop
       <button id="model-tab" role="tab" aria-selected={tab === "model"} aria-controls="model-properties" onClick={() => setTab("model")}>3D Model</button>
       <button id="camera-tab" role="tab" aria-selected={tab === "camera"} aria-controls="camera-properties" onClick={() => setTab("camera")}>Camera</button>
       <button id="text-tab" role="tab" aria-selected={tab === "text"} aria-controls="text-properties" onClick={() => setTab("text")}>Text</button>
+      <button id="gradient-tab" role="tab" aria-selected={tab === "gradient"} aria-controls="gradient-properties" onClick={() => setTab("gradient")}>Gradient</button>
       <button id="cards-tab" role="tab" aria-selected={tab === "cards"} aria-controls="cards-properties" onClick={() => setTab("cards")}>Cards</button>
     </div>
     <div className="properties-body" role="tabpanel" id={`${tab}-properties`} aria-labelledby={`${tab}-tab`} key={tab}>
@@ -241,6 +245,34 @@ export function PropertiesPanel({ ascii, model, onAscii, onModel, status }: Prop
             <p className="property-help">Size follows the camera scroll and reverses when scrolling up. The frame follows the full viewport; font sizes are pixels within that frame. Opacity stays at 100%; the side view is naturally edge-on.</p>
           </Group>
         </div>
+      </> : tab === "gradient" ? <>
+        <div className="property-card">
+          <Group title="Palette">
+            <Color label="Cursor light" value={gradient.highlight} onChange={v => gr("highlight", v)} />
+            <Color label="Midtone" value={gradient.slate} onChange={v => gr("slate", v)} />
+            <Color label="Base" value={gradient.base} onChange={v => gr("base", v)} />
+            <Color label="Shadow" value={gradient.shadow} onChange={v => gr("shadow", v)} />
+          </Group>
+          <Group title="Movement & light">
+            <Toggle label="Drift" value={!gradient.paused} onChange={v => gr("paused", !v)} />
+            <Range label="Drift speed · ×" value={gradient.speed} min={0.25} max={3} step={0.05} onChange={v => gr("speed", v)} />
+            <Range label="Cursor smoothing · ms" value={gradient.smoothing} min={0} max={1200} step={25} onChange={v => gr("smoothing", v)} />
+            <Range label="White point influence · %" value={gradient.size} min={30} max={160} step={1} onChange={v => gr("size", v)} />
+            <Range label="White point weight · %" value={gradient.intensity} min={0} max={100} step={1} onChange={v => gr("intensity", v)} />
+            <Range label="Mesh warp" value={gradient.warp} min={0} max={1} onChange={v => gr("warp", v)} />
+            <Range label="Blend softness" value={gradient.softness} min={0} max={1} onChange={v => gr("softness", v)} />
+            <p className="property-help">The light follows your cursor across the whole About frame, so moving the mouse anywhere sweeps it over the word. It only draws while the frame is on screen.</p>
+          </Group>
+          <Group title="Inner shadow · text">
+            <Toggle label="Inner shadow" value={gradient.shadowEnabled} onChange={v => gr("shadowEnabled", v)} />
+            <Color label="Shadow color" value={gradient.shadowColor} onChange={v => gr("shadowColor", v)} />
+            <Range label="Opacity" value={gradient.shadowOpacity} min={0} max={1} onChange={v => gr("shadowOpacity", v)} />
+            <Range label="Offset X · px" value={gradient.shadowX} min={-10} max={10} step={0.5} onChange={v => gr("shadowX", v)} />
+            <Range label="Offset Y · px" value={gradient.shadowY} min={-10} max={10} step={0.5} onChange={v => gr("shadowY", v)} />
+            <Range label="Blur · px" value={gradient.shadowBlur} min={0} max={10} step={0.5} onChange={v => gr("shadowBlur", v)} />
+            <p className="property-help">Sits inside the letters only: a dark edge on the side the offset points away from, like an engraved word.</p>
+          </Group>
+        </div>
       </> : tab === "cards" ? <>
         <div className="property-card">
           <Group title="Scroll camera">
@@ -295,7 +327,7 @@ export function PropertiesPanel({ ascii, model, onAscii, onModel, status }: Prop
         </div>
       </>}
     </div>
-    <div className="properties-preset"><button onClick={() => setSaveStatus(saveDefaultSettings(ascii, model) && saveCardSettings() ? "Default saved" : "Could not save in this browser")}>Save as default</button><span role="status">{saveStatus}</span></div>
-    <footer className="properties-footer"><span>{status === "checking" ? "Connecting renderer…" : status === "yes" ? "Changes update in real time" : "Static preview"}</span><button onClick={() => tab === "ascii" ? onAscii({ ...defaultAscii }) : tab === "camera" ? onModel({ ...model, ...defaultCamera }) : tab === "cards" ? setCardSettings(defaultCardSettings) : tab === "text" ? onModel({ ...model, ...defaultText }) : onModel({ ...defaultModel })}>Reset {tab === "ascii" ? "effect" : tab === "camera" ? "camera" : tab === "cards" ? "cards" : tab === "text" ? "text" : "model"}</button></footer>
+    <div className="properties-preset"><button onClick={() => setSaveStatus(saveDefaultSettings(ascii, model) && saveCardSettings() && saveGradientSettings() ? "Default saved" : "Could not save in this browser")}>Save as default</button><span role="status">{saveStatus}</span></div>
+    <footer className="properties-footer"><span>{status === "checking" ? "Connecting renderer…" : status === "yes" ? "Changes update in real time" : "Static preview"}</span><button onClick={() => tab === "ascii" ? onAscii({ ...defaultAscii }) : tab === "camera" ? onModel({ ...model, ...defaultCamera }) : tab === "gradient" ? setGradientSettings(defaultGradientSettings) : tab === "cards" ? setCardSettings(defaultCardSettings) : tab === "text" ? onModel({ ...model, ...defaultText }) : onModel({ ...defaultModel })}>Reset {tab === "ascii" ? "effect" : tab === "camera" ? "camera" : tab === "gradient" ? "gradient" : tab === "cards" ? "cards" : tab === "text" ? "text" : "model"}</button></footer>
   </aside>
 }
