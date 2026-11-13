@@ -33,6 +33,22 @@ export const defaultGradientSettings = {
   typeColor: "#8e8e8e",
   typeBg: "#0a0a0a",
   typeHud: false,      // small step counter in the corner, for tuning
+  // Skull frame (Figma 8:261): the chrome skull turns as you scroll
+  skullScroll: 200,         // vh of scrolling for the whole rotation (the frame stays pinned that long)
+  skullTurns: 1,            // full turns over that scroll; negative reverses
+  skullSize: 90,            // % of the canvas height the skull fills
+  skullColor: "#ffffff",    // same chrome defaults as the hero tiger
+  skullRoughness: 0.04,
+  skullMetalness: 1,
+  skullLight: 1,            // studio light (environment intensity ×)
+  skullStudioRotation: 0,   // degrees
+  // Client list in the skull frame
+  listSize: 55,             // px
+  listColor: "#414141",     // regular state
+  listHover: "#ffffff",     // hover state: also moves in front of the skull
+  listLine: "#414141",      // full-width line behind a hovered name
+  listFade: 160,            // ms
+  listBg: "#0a0a0a",
   // Inner shadow on the word (SVG filter: inverted alpha, offset, blurred, clipped to the glyphs)
   shadowEnabled: true,
   shadowColor: "#000000",
@@ -85,6 +101,20 @@ export function loadGradientSettings() {
       typeColor: hex(s.typeColor, d.typeColor),
       typeBg: hex(s.typeBg, d.typeBg),
       typeHud: typeof s.typeHud === "boolean" ? s.typeHud : d.typeHud,
+      skullScroll: num(s.skullScroll, d.skullScroll, 50, 600),
+      skullTurns: num(s.skullTurns, d.skullTurns, -4, 4),
+      skullSize: num(s.skullSize, d.skullSize, 40, 130),
+      skullColor: hex(s.skullColor, d.skullColor),
+      skullRoughness: num(s.skullRoughness, d.skullRoughness, 0, 1),
+      skullMetalness: num(s.skullMetalness, d.skullMetalness, 0, 1),
+      skullLight: num(s.skullLight, d.skullLight, 0, 3),
+      skullStudioRotation: num(s.skullStudioRotation, d.skullStudioRotation, -180, 180),
+      listSize: num(s.listSize, d.listSize, 20, 120),
+      listColor: hex(s.listColor, d.listColor),
+      listHover: hex(s.listHover, d.listHover),
+      listLine: hex(s.listLine, d.listLine),
+      listFade: num(s.listFade, d.listFade, 0, 1000),
+      listBg: hex(s.listBg, d.listBg),
       shadowEnabled: typeof s.shadowEnabled === "boolean" ? s.shadowEnabled : d.shadowEnabled,
       shadowColor: hex(s.shadowColor, d.shadowColor),
       shadowOpacity: num(s.shadowOpacity, d.shadowOpacity, 0, 1),

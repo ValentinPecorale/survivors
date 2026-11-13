@@ -107,7 +107,7 @@ export function PropertiesPanel({ ascii, model, onAscii, onModel, status }: Prop
       <button id="model-tab" role="tab" aria-selected={tab === "model"} aria-controls="model-properties" onClick={() => setTab("model")}>3D Model</button>
       <button id="camera-tab" role="tab" aria-selected={tab === "camera"} aria-controls="camera-properties" onClick={() => setTab("camera")}>Camera</button>
       <button id="text-tab" role="tab" aria-selected={tab === "text"} aria-controls="text-properties" onClick={() => setTab("text")}>Text</button>
-      <button id="gradient-tab" role="tab" aria-selected={tab === "gradient"} aria-controls="gradient-properties" onClick={() => setTab("gradient")}>Gradient</button>
+      <button id="gradient-tab" role="tab" aria-selected={tab === "gradient"} aria-controls="gradient-properties" onClick={() => setTab("gradient")}>About</button>
       <button id="cards-tab" role="tab" aria-selected={tab === "cards"} aria-controls="cards-properties" onClick={() => setTab("cards")}>Cards</button>
     </div>
     <div className="properties-body" role="tabpanel" id={`${tab}-properties`} aria-labelledby={`${tab}-tab`} key={tab}>
@@ -268,13 +268,36 @@ export function PropertiesPanel({ ascii, model, onAscii, onModel, status }: Prop
             <Color label="Frame background" value={gradient.typeBg} onChange={v => gr("typeBg", v)} />
             <p className="property-help">Font stays Geist. The gradient and the inner shadow follow the text size.</p>
           </Group>
-          <Group title="Palette">
+          <Group title="Skull · scroll">
+            <Range label="Scroll per rotation · vh" value={gradient.skullScroll} min={50} max={600} step={10} onChange={v => gr("skullScroll", v)} />
+            <Range label="Turns" value={gradient.skullTurns} min={-4} max={4} step={0.25} onChange={v => gr("skullTurns", v)} />
+            <Range label="Skull size · %" value={gradient.skullSize} min={40} max={130} step={1} onChange={v => gr("skullSize", v)} />
+            <p className="property-help">The frame stays pinned for this much scrolling while the skull turns; scroll back to turn it back. One turn is the full 360°. A negative value spins the other way. The end of this stretch is the end of About.</p>
+          </Group>
+          <Group title="Skull · material">
+            <Color label="Chrome color" value={gradient.skullColor} onChange={v => gr("skullColor", v)} />
+            <Range label="Roughness" value={gradient.skullRoughness} min={0} max={1} onChange={v => gr("skullRoughness", v)} />
+            <Range label="Metalness" value={gradient.skullMetalness} min={0} max={1} onChange={v => gr("skullMetalness", v)} />
+            <Range label="Studio light" value={gradient.skullLight} min={0} max={3} onChange={v => gr("skullLight", v)} />
+            <Range label="Studio rotation" value={gradient.skullStudioRotation} min={-180} max={180} step={1} onChange={v => gr("skullStudioRotation", v)} />
+            <p className="property-help">Starts identical to the hero tiger chrome (same studio HDR, roughness 0.04, metalness 1, same key light). Change these to tune the skull on its own.</p>
+          </Group>
+          <Group title="Client list">
+            <Range label="Text size · px" value={gradient.listSize} min={20} max={120} step={1} onChange={v => gr("listSize", v)} />
+            <Color label="Regular color" value={gradient.listColor} onChange={v => gr("listColor", v)} />
+            <Color label="Hover color" value={gradient.listHover} onChange={v => gr("listHover", v)} />
+            <Color label="Line color" value={gradient.listLine} onChange={v => gr("listLine", v)} />
+            <Color label="Frame background" value={gradient.listBg} onChange={v => gr("listBg", v)} />
+            <Range label="Hover fade · ms" value={gradient.listFade} min={0} max={1000} step={10} onChange={v => gr("listFade", v)} />
+            <p className="property-help">A hovered name turns white, gets its full-width line, and moves in front of the skull; leaving puts it back behind. The names themselves are edited in Keystatic (About → Client list).</p>
+          </Group>
+          <Group title="Gradient · palette">
             <Color label="Cursor light" value={gradient.highlight} onChange={v => gr("highlight", v)} />
             <Color label="Midtone" value={gradient.slate} onChange={v => gr("slate", v)} />
             <Color label="Base" value={gradient.base} onChange={v => gr("base", v)} />
             <Color label="Shadow" value={gradient.shadow} onChange={v => gr("shadow", v)} />
           </Group>
-          <Group title="Movement & light">
+          <Group title="Gradient · movement & light">
             <Toggle label="Drift" value={!gradient.paused} onChange={v => gr("paused", !v)} />
             <Range label="Drift speed · ×" value={gradient.speed} min={0.25} max={3} step={0.05} onChange={v => gr("speed", v)} />
             <Range label="Cursor smoothing · ms" value={gradient.smoothing} min={0} max={1200} step={25} onChange={v => gr("smoothing", v)} />
@@ -349,6 +372,6 @@ export function PropertiesPanel({ ascii, model, onAscii, onModel, status }: Prop
       </>}
     </div>
     <div className="properties-preset"><button onClick={() => setSaveStatus(saveDefaultSettings(ascii, model) && saveCardSettings() && saveGradientSettings() ? "Default saved" : "Could not save in this browser")}>Save as default</button><span role="status">{saveStatus}</span></div>
-    <footer className="properties-footer"><span>{status === "checking" ? "Connecting renderer…" : status === "yes" ? "Changes update in real time" : "Static preview"}</span><button onClick={() => tab === "ascii" ? onAscii({ ...defaultAscii }) : tab === "camera" ? onModel({ ...model, ...defaultCamera }) : tab === "gradient" ? setGradientSettings(defaultGradientSettings) : tab === "cards" ? setCardSettings(defaultCardSettings) : tab === "text" ? onModel({ ...model, ...defaultText }) : onModel({ ...defaultModel })}>Reset {tab === "ascii" ? "effect" : tab === "camera" ? "camera" : tab === "gradient" ? "gradient" : tab === "cards" ? "cards" : tab === "text" ? "text" : "model"}</button></footer>
+    <footer className="properties-footer"><span>{status === "checking" ? "Connecting renderer…" : status === "yes" ? "Changes update in real time" : "Static preview"}</span><button onClick={() => tab === "ascii" ? onAscii({ ...defaultAscii }) : tab === "camera" ? onModel({ ...model, ...defaultCamera }) : tab === "gradient" ? setGradientSettings(defaultGradientSettings) : tab === "cards" ? setCardSettings(defaultCardSettings) : tab === "text" ? onModel({ ...model, ...defaultText }) : onModel({ ...defaultModel })}>Reset {tab === "ascii" ? "effect" : tab === "camera" ? "camera" : tab === "gradient" ? "about" : tab === "cards" ? "cards" : tab === "text" ? "text" : "model"}</button></footer>
   </aside>
 }

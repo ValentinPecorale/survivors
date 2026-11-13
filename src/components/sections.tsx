@@ -1,4 +1,5 @@
 import { HighlightFrame } from "./highlight-gradient"
+import { SkullFrame } from "./skull-frame"
 import { SHORTCUT_KEYS } from "./shortcuts"
 import about from "@/content/sections/about.json"
 import services from "@/content/sections/services.json"
@@ -25,5 +26,6 @@ export function SectionContent({ id }: { id: SectionId }) {
       <div className="section-intro-text"><p>{entry.text}</p>{/* 2-column grid: text lives in column 1, column 2 stays empty (Figma 15:146) */}</div>
     </section>
     {"words" in entry && entry.words.length > 0 && <HighlightFrame id={id} words={entry.words} />}
+    {"clients" in entry && entry.clients.length > 0 && <SkullFrame id={id} clients={entry.clients} />}
   </>
 }

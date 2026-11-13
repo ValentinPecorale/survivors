@@ -184,6 +184,25 @@ body {
 /* The word box hugs the text, so the gradient (a percentage of this box) hugs it too and follows every keypress. */
 .section-feature-word { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); }
 .section-feature-stage { position: absolute; inset: 0; pointer-events: none; }
+/* Skull frame (Figma 8:261). Layers, back to front: regular names → skull → hovered name. */
+.skull-track { position: relative; }
+.skull-frame { position: sticky; top: 0; height: 100vh; height: 100svh; overflow: hidden; display: grid; place-items: center; background: #0a0a0a; font-family: var(--font-geist-sans), sans-serif; }
+.client-list { list-style: none; margin: 0; padding: 0; width: 100%; display: flex; flex-direction: column; align-items: stretch; gap: 8px; }
+.client-list li { position: relative; z-index: 0; display: flex; justify-content: center; padding: 8px; color: var(--list-color, #414141); font-size: var(--list-size, 55px); font-weight: 700; line-height: 1.1145; letter-spacing: 0; text-align: center; white-space: nowrap; transition: color var(--list-fade, 160ms) ease; }
+/* The line sits behind the letters and spans the whole screen; it only shows on the hovered name. */
+.client-list li::before { content: ""; position: absolute; left: 0; right: 0; top: 50%; height: 1px; background: var(--list-line, #414141); opacity: 0; z-index: -1; transition: opacity var(--list-fade, 160ms) ease; }
+@media (hover: hover) {
+  .client-list li:hover { z-index: 2; color: var(--list-hover, #fff); }
+  .client-list li:hover::before { opacity: 1; }
+}
+/* pointer-events: none keeps the names under the skull hoverable. */
+.skull-stage { position: absolute; left: 50%; top: 50%; width: min(329px, 80vw); aspect-ratio: 329 / 382; transform: translate(-50%, -50%); z-index: 1; pointer-events: none; }
+.skull-stage img { object-fit: contain; }
+.skull-stage canvas { opacity: 0; transition: opacity 0.4s ease; }
+.skull-stage[data-ready="true"] canvas { opacity: 1; }
+.skull-stage img { transition: opacity 0.4s ease; }
+.skull-stage[data-ready="true"] img { opacity: 0; } /* the poster only stands in until the live canvas is drawing */
+@media (max-width: 700px) { .client-list li { font-size: min(var(--list-size, 55px), max(28px, 8vw)); } }
 .visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 /* The image box is the text box grown by these percentages (Figma insets): top 12.2%, right 3.45%, bottom 14.63%, left 4.02%. */
 .section-feature-bg { position: absolute; inset: -12.2% -3.45% -14.63% -4.02%; pointer-events: none; }

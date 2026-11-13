@@ -20,6 +20,11 @@ export default config({
         description: 'Typed one at a time in the pinned second frame: scrolling deletes the current word letter by letter, then types the next. The gradient hugs the text. The last word, fully typed, ends the section.',
         itemLabel: props => props.value,
       }),
+      clients: fields.array(fields.text({ label: 'Client', validation: { isRequired: true } }), {
+        label: 'Client list',
+        description: 'The names in the skull frame, top to bottom. Hovering one turns it white and brings it in front of the skull.',
+        itemLabel: props => props.value,
+      }),
     }),
     services: intro('Services — opening frame', 'src/content/sections/services'),
     work: intro('Work — opening frame', 'src/content/sections/work'),
