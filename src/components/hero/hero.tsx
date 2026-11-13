@@ -49,8 +49,13 @@ export function Hero() {
         {gpu === "no" && <Image src="/models/scene-poster.webp" alt="A running tiger surrounded by an ASCII forest" fill sizes="100vw" className="object-contain" />}
         {gpu === "yes" && <HeroScene ascii={sceneAscii} model={liveModel} onError={() => setGpu("no")} />}
       </div>
-      {/* Figma 21:400 — bottom-left headline over the scene; clicks fall through so cursor orbit still works. */}
-      <h1 className="hero-title">Creating stuff that<br />will survive.</h1>
+      {/* Figma 21:400 — headline bottom-left, services bottom-right; clicks fall through so cursor orbit still works. */}
+      <div className="hero-overlay">
+        <h1 className="hero-title">Creating stuff that<br />will survive.</h1>
+        <ul className="hero-services" aria-label="Services">
+          <li>Branding</li><li>Websites</li><li>Interior design</li><li>AI Photo studios</li>
+        </ul>
+      </div>
       <PropertiesPanel ascii={liveAscii} model={liveModel} onAscii={setAscii} onModel={setModel} status={gpu} />
     </section>
   )
