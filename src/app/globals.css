@@ -176,14 +176,13 @@ body {
 .section-intro h1 { margin: 0; color: #fff; font-size: 47px; font-weight: 700; line-height: 40px; letter-spacing: 0; overflow-wrap: anywhere; }
 .section-intro-text p { margin: 0; grid-column: 1; }
 .section-intro-text { color: #8e8e8e; font-size: 26px; font-weight: 600; line-height: normal; letter-spacing: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 16px; white-space: pre-wrap; overflow-wrap: anywhere; }
-/* Pinned word sequence: the track is as tall as the scroll it needs, the frame sticks to the screen inside it. */
+/* Pinned typewriter: the track is as tall as the scroll it needs, the frame sticks to the screen inside it. Plain background:
+   the inner shadow belongs to the text only, never to the frame. */
 .section-feature-track { position: relative; }
-.section-feature { position: sticky; top: 0; height: 100vh; height: 100svh; overflow: hidden; background: #0a0a0a; font-family: var(--font-geist-sans), sans-serif;
-  /* words emerge from, and leave into, soft edges instead of being cut off */
-  -webkit-mask-image: linear-gradient(to bottom, transparent, #000 14%, #000 86%, transparent); mask-image: linear-gradient(to bottom, transparent, #000 14%, #000 86%, transparent); }
-/* Sized to the nearest word by script; the gradient inside it bleeds past it by the Figma insets. */
-.section-feature-stage { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: 174px; height: 41px; opacity: 0; visibility: hidden; pointer-events: none; }
-.section-feature-word { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%) translateY(calc(var(--i, 0) * 100svh)); will-change: transform; }
+.section-feature { position: sticky; top: 0; height: 100vh; height: 100svh; overflow: hidden; background: #0a0a0a; font-family: var(--font-geist-sans), sans-serif; }
+/* The word box hugs the text, so the gradient (a percentage of this box) hugs it too and follows every keypress. */
+.section-feature-word { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); }
+.section-feature-stage { position: absolute; inset: 0; pointer-events: none; }
 .visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 /* The image box is the text box grown by these percentages (Figma insets): top 12.2%, right 3.45%, bottom 14.63%, left 4.02%. */
 .section-feature-bg { position: absolute; inset: -12.2% -3.45% -14.63% -4.02%; pointer-events: none; }
@@ -191,7 +190,7 @@ body {
 .section-feature-bg canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
 .mesh-canvas { opacity: 0; transition: opacity .3s ease; } /* fades in over the poster once WebGL is drawing */
 .section-feature-defs { position: absolute; width: 0; height: 0; pointer-events: none; }
-.section-feature-word p { margin: 0; color: #8e8e8e; font-size: 39px; font-weight: 600; line-height: 41px; letter-spacing: 0; text-align: center; white-space: nowrap; }
+.section-feature-word p { margin: 0; color: #8e8e8e; font-size: 39px; font-weight: 600; line-height: 41px; letter-spacing: 0; text-align: center; white-space: pre; min-height: 41px; }
 @media (max-width: 700px) {
   .section-feature-word p { font-size: clamp(26px, 8vw, 39px); line-height: calc(41 / 39); }
 }

@@ -20,9 +20,9 @@ export const defaultGradientSettings = {
   intensity: 100,  // % weight of the cursor point
   warp: 0.3,       // domain warp of the whole field
   softness: 0.7,   // how far colours blend into each other
-  // Word sequence (About frame): how far you scroll per word, and how long a word rests at the centre
-  wordScroll: 90,  // vh of scrolling per word step
-  wordHold: 30,    // % of a step a word rests at the centre before the next one starts
+  // Typewriter (About frame): every step of scroll is one keypress
+  typeSensitivity: 80, // px of scroll per keypress
+  typeBeat: 1,         // empty steps between deleting a word and typing the next
   // Inner shadow on the word (SVG filter: inverted alpha, offset, blurred, clipped to the glyphs)
   shadowEnabled: true,
   shadowColor: "#000000",
@@ -63,8 +63,8 @@ export function loadGradientSettings() {
       intensity: num(s.intensity, d.intensity, 0, 100),
       warp: num(s.warp, d.warp, 0, 1),
       softness: num(s.softness, d.softness, 0, 1),
-      wordScroll: num(s.wordScroll, d.wordScroll, 40, 200),
-      wordHold: num(s.wordHold, d.wordHold, 0, 60),
+      typeSensitivity: num(s.typeSensitivity, d.typeSensitivity, 20, 200),
+      typeBeat: Math.round(num(s.typeBeat, d.typeBeat, 0, 6)),
       shadowEnabled: typeof s.shadowEnabled === "boolean" ? s.shadowEnabled : d.shadowEnabled,
       shadowColor: hex(s.shadowColor, d.shadowColor),
       shadowOpacity: num(s.shadowOpacity, d.shadowOpacity, 0, 1),

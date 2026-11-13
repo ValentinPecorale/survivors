@@ -17,7 +17,7 @@ export default config({
     about: intro('About — opening frame + words', 'src/content/sections/about', {
       words: fields.array(fields.text({ label: 'Word', validation: { isRequired: true } }), {
         label: 'Highlight words',
-        description: 'Shown one at a time in the pinned second frame: each rises from the bottom, and the gradient hugs it once it is centred. The last one ends the section.',
+        description: 'Typed one at a time in the pinned second frame: scrolling deletes the current word letter by letter, then types the next. The gradient hugs the text. The last word, fully typed, ends the section.',
         itemLabel: props => props.value,
       }),
     }),

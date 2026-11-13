@@ -1,8 +1,9 @@
 "use client"
 
 import Image from "next/image"
-import { useEffect, useId, useRef, type CSSProperties, type RefObject } from "react"
+import { useEffect, useId, useMemo, useRef, useState, type RefObject } from "react"
 import { useGradientSettings, type GradientSettings } from "./gradient-settings"
+import { buildTimeline } from "./typewriter-timeline"
 
 /*
  * The interactive mesh gradient from the chrome-gradient exploration, as the backdrop of the About "Websites"
@@ -74,7 +75,8 @@ const encode = (v: number) => v <= .0031308 ? v * 12.92 : 1.055 * v ** (1 / 2.4)
 function drawPoster(canvas: HTMLCanvasElement, settings: GradientSettings, aspect: number) {
   const ctx = canvas.getContext("2d")
   if (!ctx) return
-  canvas.width = 240; canvas.height = Math.max(1, Math.round(240 / aspect))
+  if (!(aspect > 0) || !Number.isFinite(aspect)) return // empty text: the box has no width
+  canvas.width = Math.max(1, Math.round(240 * Math.min(1, aspect))); canvas.height = Math.max(1, Math.round(240 / Math.max(1, aspect)))
   const image = ctx.createImageData(canvas.width, canvas.height)
   const colors = [settings.highlight, settings.shadow, settings.slate, settings.base].map(hex => rgb(hex).map(linear))
   const points = [[-.537, .296], [1.22, .587], [.443, -.371], [-1.089, -.654]]
@@ -124,7 +126,10 @@ function MeshGradient({ settings, surface, box, idle }: { settings: GradientSett
     let repaint = 0
     const paint = () => {
       cancelAnimationFrame(repaint)
-      repaint = requestAnimationFrame(() => drawPoster(poster, live.current, element.clientWidth / Math.max(1, element.clientHeight)))
+      repaint = requestAnimationFrame(() => {
+        if (canvasRef.current?.style.opacity === "1") return // WebGL is drawing over it: nothing to show, nothing to spend
+        drawPoster(poster, live.current, element.clientWidth / Math.max(1, element.clientHeight))
+      })
     }
     const observer = new ResizeObserver(paint); observer.observe(element); paint()
     return () => { observer.disconnect(); cancelAnimationFrame(repaint) }
@@ -187,7 +192,10 @@ function MeshGradient({ settings, surface, box, idle }: { settings: GradientSett
     }
     const start = () => { if (!frame && visible && !lost && !document.hidden) { previous = 0; frame = requestAnimationFrame(render) } }
     const stop = () => { cancelAnimationFrame(frame); frame = 0 }
-    const contextLost = (event: Event) => { event.preventDefault(); lost = true; canvas.style.opacity = "0"; stop() }
+    const contextLost = (event: Event) => {
+      event.preventDefault(); lost = true; canvas.style.opacity = "0"; stop()
+      if (posterRef.current) drawPoster(posterRef.current, live.current, element.clientWidth / Math.max(1, element.clientHeight))
+    }
     const visibility = () => { stop(); start() }
     const intersection = new IntersectionObserver(([entry]) => { visible = entry.isIntersecting; if (visible) start(); else stop() })
     const observer = new ResizeObserver(resize); observer.observe(element); resize()
@@ -206,145 +214,74 @@ function MeshGradient({ settings, surface, box, idle }: { settings: GradientSett
   return <><canvas ref={posterRef} className="mesh-poster" /><canvas ref={canvasRef} className="mesh-canvas" /></>
 }
 
-const smooth = (x: number) => x * x * (3 - 2 * x)
-
 /**
- * Continuous word index (0 … count−1) for scroll progress measured in word steps. Each step is a rest at the
- * centre (`hold` of the step) followed by a smoothstep travel to the next word: zero speed at both ends, so a
- * word settles into the centre instead of stopping dead. The next word never moves while one is resting.
- */
-export function wordIndexAt(progress: number, count: number, hold: number) {
-  if (count <= 1 || progress <= 0) return 0
-  if (progress >= count - 1) return count - 1
-  const step = Math.floor(progress), local = progress - step
-  return local < hold ? step : step + smooth((local - hold) / (1 - hold))
-}
-
-/** 1 while a word is at the centre, falling to 0 once it is 0.2 of a step away: the gradient and shadow only exist on a settled word. */
-const settled = (distance: number) => Math.min(1, Math.max(0, 1 - (distance - 0.03) / 0.17))
-
-/**
- * How much of the current word (and its gradient and shadow) is left while the next word rises toward it.
- * `distance` is how far the next word still is from the centre, in steps (1 = just entering at the bottom).
- * The current word does not move: it stays fully there until the newcomer is half a step away, then fades out
- * and is gone by 0.2, before the newcomer arrives, so the two never overlap.
- */
-const leaving = (distance: number) => smooth(Math.min(1, Math.max(0, (distance - 0.2) / 0.3)))
-
-/**
- * Figma 27:414, as a pinned sequence. The frame sticks to the screen while the card scrolls, and the centre never
- * scrolls: the current word and its gradient stay exactly where they are. Scrolling brings the next word up from
- * the bottom edge; as it nears the centre the current word and gradient fade out, and once it has landed the
- * gradient appears around it (sized to the word's own width) and it gets its inner shadow. The last word landing
- * on the gradient is the end of the section.
+ * Figma 27:414, as a pinned typewriter. The frame sticks to the screen while the card scrolls, and every
+ * `typeSensitivity` px of scroll is one keypress (see typewriter-timeline.ts): the current word is deleted
+ * letter by letter, then the next is typed; scrolling back undoes it. The last word fully typed is the end of
+ * the card, so the section ends exactly there.
  *
- * One gradient (one WebGL canvas) serves all words: it is resized to whichever word is nearest, and is invisible
- * whenever a word is travelling, so it never has to be in two places at once.
- * The inner shadow is an SVG filter per word (CSS has no inner shadow for text): it inverts the glyph alpha,
- * offsets and blurs it, and keeps only what falls inside the letters. Its opacity follows the same "settled"
- * curve, so a word only has the shadow while it is over the gradient.
+ * The gradient (one WebGL canvas) is a percentage of the word's own box, which hugs the text, so it grows and
+ * shrinks with every keypress and is gone while the field is empty. The inner shadow is an SVG filter on the
+ * text only (CSS has no inner shadow for text): it inverts the glyph alpha, offsets and blurs it, and keeps
+ * only what falls inside the letters.
  */
 export function HighlightFrame({ id, words }: { id: string; words: readonly string[] }) {
   const g = useGradientSettings()
   const uid = useId().replace(/:/g, "")
+  const timeline = useMemo(() => buildTimeline(words, g.typeBeat), [words, g.typeBeat])
+  const [step, setStep] = useState(0)
   const track = useRef<HTMLDivElement>(null)
   const frame = useRef<HTMLElement>(null)
-  const stage = useRef<HTMLDivElement>(null)
   const box = useRef<HTMLSpanElement>(null)
-  const items = useRef<(HTMLDivElement | null)[]>([])
-  const floods = useRef<(SVGFEFloodElement | null)[]>([])
   const idle = useRef(false)
-  const live = useRef(g)
+  const live = useRef({ total: timeline.total, sensitivity: g.typeSensitivity })
   const apply = useRef<() => void>(() => {})
-  const count = words.length
-  const hold = Math.min(0.6, Math.max(0, g.wordHold / 100))
-  const steps = count > 1 ? count - 1 + hold : 0
 
-  // Settings changed in the panel: re-run the layout with the new numbers.
-  useEffect(() => { live.current = g; apply.current() }, [g])
-
+  // Scroll position → keypress count. Native scrolling: no input is captured, the card keeps its own scroll.
+  useEffect(() => { live.current = { total: timeline.total, sensitivity: g.typeSensitivity }; apply.current() }, [timeline.total, g.typeSensitivity])
   useEffect(() => {
-    const trackEl = track.current, frameEl = frame.current, stageEl = stage.current
+    const trackEl = track.current
     const scroller = trackEl?.closest<HTMLElement>(".site-card")
-    if (!trackEl || !frameEl || !stageEl || !scroller) return
-    let raf = 0
+    if (!trackEl || !scroller) return
     const run = () => {
-      raf = 0
-      const s = live.current
-      const h = Math.min(0.6, Math.max(0, s.wordHold / 100))
-      const height = frameEl.clientHeight
-      const progress = (scroller.scrollTop - trackEl.offsetTop) / Math.max(1, scroller.clientHeight * s.wordScroll / 100)
-      const t = wordIndexAt(progress, count, h)
-      // Nothing ever travels upward. A word below the centre rises to it; a word at or past the centre stays put
-      // and fades out when the next word gets close. `strength` is its gradient/shadow (and, once it is the
-      // current word, its own opacity).
-      let active = 0, glow = 0
-      for (let i = 0; i < count; i++) {
-        const item = items.current[i]
-        if (!item) continue
-        const ahead = i - t // steps still to rise (> 0), or 0 once it has arrived
-        const strength = ahead > 0 ? settled(ahead) : i < count - 1 ? leaving(i + 1 - t) : 1
-        const alpha = ahead > 0 ? 1 : strength
-        item.style.visibility = ahead >= 1.02 || alpha <= 0.001 ? "hidden" : "visible"
-        item.style.opacity = alpha.toFixed(3)
-        item.style.transform = `translate(-50%, -50%) translateY(${(Math.max(ahead, 0) * height).toFixed(1)}px)`
-        const shade = s.shadowEnabled ? strength : 0
-        const text = item.firstElementChild as HTMLElement | null
-        if (text) text.style.filter = shade > 0.01 ? `url(#${uid}-shadow-${i})` : "none"
-        floods.current[i]?.setAttribute("flood-opacity", (s.shadowOpacity * shade).toFixed(3))
-        if (strength > glow) { glow = strength; active = i }
-      }
-      // One gradient serves every word: it takes the size of whichever word is strongest right now.
-      const label = items.current[active]?.firstElementChild as HTMLElement | null
-      if (label) { stageEl.style.width = `${label.offsetWidth}px`; stageEl.style.height = `${label.offsetHeight}px` }
-      stageEl.style.opacity = glow.toFixed(3)
-      stageEl.style.visibility = glow > 0.001 ? "visible" : "hidden"
-      idle.current = glow <= 0.001
+      const { total, sensitivity } = live.current
+      const next = Math.min(total, Math.max(0, Math.floor((scroller.scrollTop - trackEl.offsetTop) / sensitivity)))
+      setStep(prev => prev === next ? prev : next)
     }
-    const schedule = () => { if (!raf) raf = requestAnimationFrame(run) }
     apply.current = run
     run()
-    scroller.addEventListener("scroll", schedule, { passive: true })
-    window.addEventListener("resize", schedule)
-    const observer = new ResizeObserver(schedule) // word widths change when the font loads
-    items.current.forEach(el => el && observer.observe(el))
-    void document.fonts?.ready.then(schedule)
-    return () => {
-      cancelAnimationFrame(raf); observer.disconnect()
-      scroller.removeEventListener("scroll", schedule); window.removeEventListener("resize", schedule)
-      apply.current = () => {}
-    }
-  }, [count, uid])
+    scroller.addEventListener("scroll", run, { passive: true })
+    window.addEventListener("resize", run)
+    return () => { scroller.removeEventListener("scroll", run); window.removeEventListener("resize", run); apply.current = () => {} }
+  }, [])
+
+  const state = timeline.stateAt(step)
+  useEffect(() => { idle.current = state.text.length === 0 }, [state.text])
 
   return (
-    <div ref={track} className="section-feature-track" style={{ height: `calc(100svh + ${(steps * g.wordScroll).toFixed(1)}svh)` }}>
+    <div ref={track} className="section-feature-track" style={{ height: `calc(100svh + ${timeline.total * g.typeSensitivity}px)` }}>
       <section ref={frame} className="section-feature" aria-label={`${id} highlight`}>
         <svg className="section-feature-defs" width="0" height="0" aria-hidden="true" focusable="false">
-          {words.map((_, i) => (
-            <filter key={i} id={`${uid}-shadow-${i}`} colorInterpolationFilters="sRGB">
-              <feComponentTransfer in="SourceAlpha" result="inverse"><feFuncA type="table" tableValues="1 0" /></feComponentTransfer>
-              <feGaussianBlur in="inverse" stdDeviation={g.shadowBlur} result="blurred" />
-              <feOffset in="blurred" dx={g.shadowX} dy={g.shadowY} result="offset" />
-              <feFlood ref={el => { floods.current[i] = el }} floodColor={g.shadowColor} result="tint" />
-              <feComposite in="tint" in2="offset" operator="in" result="shade" />
-              <feComposite in="shade" in2="SourceAlpha" operator="in" result="inner" />
-              <feMerge><feMergeNode in="SourceGraphic" /><feMergeNode in="inner" /></feMerge>
-            </filter>
-          ))}
+          <filter id={`${uid}-shadow`} colorInterpolationFilters="sRGB">
+            <feComponentTransfer in="SourceAlpha" result="inverse"><feFuncA type="table" tableValues="1 0" /></feComponentTransfer>
+            <feGaussianBlur in="inverse" stdDeviation={g.shadowBlur} result="blurred" />
+            <feOffset in="blurred" dx={g.shadowX} dy={g.shadowY} result="offset" />
+            <feFlood floodColor={g.shadowColor} floodOpacity={g.shadowOpacity} result="tint" />
+            <feComposite in="tint" in2="offset" operator="in" result="shade" />
+            <feComposite in="shade" in2="SourceAlpha" operator="in" result="inner" />
+            <feMerge><feMergeNode in="SourceGraphic" /><feMergeNode in="inner" /></feMerge>
+          </filter>
         </svg>
         <p className="visually-hidden">{words.join(", ")}</p>
-        {/* Centred, sized to the nearest word by the layout effect; the gradient bleeds past it on every side. */}
-        <div ref={stage} className="section-feature-stage" aria-hidden="true">
-          <span ref={box} className="section-feature-bg">
-            <Image src="/images/about-websites.webp" alt="" fill sizes="240px" />
-            <MeshGradient settings={g} surface={frame} box={box} idle={idle} />
-          </span>
-        </div>
-        {words.map((word, i) => (
-          <div key={word + i} ref={el => { items.current[i] = el }} className="section-feature-word" aria-hidden="true" style={{ "--i": i } as CSSProperties}>
-            <p>{word}</p>
+        <div className="section-feature-word" aria-hidden="true">
+          <div className="section-feature-stage">
+            <span ref={box} className="section-feature-bg">
+              <Image src="/images/about-websites.webp" alt="" fill sizes="240px" />
+              <MeshGradient settings={g} surface={frame} box={box} idle={idle} />
+            </span>
           </div>
-        ))}
+          <p style={{ filter: g.shadowEnabled ? `url(#${uid}-shadow)` : undefined }}>{state.text || "\u200b"}</p>
+        </div>
       </section>
     </div>
   )

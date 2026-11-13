@@ -247,10 +247,10 @@ export function PropertiesPanel({ ascii, model, onAscii, onModel, status }: Prop
         </div>
       </> : tab === "gradient" ? <>
         <div className="property-card">
-          <Group title="Word sequence">
-            <Range label="Scroll per word · vh" value={gradient.wordScroll} min={40} max={200} step={5} onChange={v => gr("wordScroll", v)} />
-            <Range label="Hold at center · %" value={gradient.wordHold} min={0} max={60} step={5} onChange={v => gr("wordHold", v)} />
-            <p className="property-help">The frame stays pinned while you scroll: each word rises from the bottom to the center, and the gradient and inner shadow appear once it has landed. Hold is how long a word rests at the center, as a share of one step, before the next one starts.</p>
+          <Group title="Typewriter">
+            <Range label="Scroll per keypress · px" value={gradient.typeSensitivity} min={20} max={200} step={5} onChange={v => gr("typeSensitivity", v)} />
+            <Range label="Pause between words · steps" value={gradient.typeBeat} min={0} max={6} step={1} onChange={v => gr("typeBeat", v)} />
+            <p className="property-help">The frame stays pinned and every step of scroll is one keypress: the word is deleted letter by letter, then the next is typed. Scrolling back undoes it. The last word fully typed is the end of the section. The gradient hugs the text as it changes.</p>
           </Group>
           <Group title="Palette">
             <Color label="Cursor light" value={gradient.highlight} onChange={v => gr("highlight", v)} />
