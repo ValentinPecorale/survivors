@@ -38,8 +38,9 @@ float noise(vec2 p) {
 vec3 linearize(vec3 c) { return mix(c/12.92,pow((c+.055)/1.055,vec3(2.4)),step(vec3(.04045),c)); }
 vec3 encode(vec3 c) { return mix(c*12.92,1.055*pow(max(c,0.),vec3(1./2.4))-.055,step(vec3(.0031308),c)); }
 void main() {
-  float aspect = resolution.x/resolution.y;
-  vec2 uv = (gl_FragCoord.xy/resolution*2.-1.)*vec2(aspect,1.);
+  // Anchored to the box's left edge at a fixed scale (1 unit = half the box height), not stretched to the box width:
+  // when the word grows or shrinks the field stays put and the box only reveals more or less of it.
+  vec2 uv = vec2(gl_FragCoord.x/(resolution.y*.5)-3.5, gl_FragCoord.y/resolution.y*2.-1.);
   vec2 n = uv*(.55+warp*.6+.1*1.6) + 70.3*73.7;
   vec2 flow = vec2(cos(phase),sin(phase))*.16;
   uv += warp*.75*vec2(noise(n+flow),noise(n+vec2(13.7,7.1)+flow));
@@ -90,7 +91,7 @@ function drawPoster(canvas: HTMLCanvasElement, settings: GradientSettings, aspec
     return (a * (1 - fy) + b * fy) * 2 - 1
   }
   for (let y = 0; y < canvas.height; y++) for (let x = 0; x < canvas.width; x++) {
-    let u = ((x + .5) / canvas.width * 2 - 1) * aspect, v = 1 - (y + .5) / canvas.height * 2
+    let u = (x + .5) / canvas.height * 2 - 3.5, v = 1 - (y + .5) / canvas.height * 2
     const scale = .71 + settings.warp * .6, nx = u * scale + 70.3 * 73.7, ny = v * scale + 70.3 * 73.7
     u += settings.warp * .75 * noise(nx + .16, ny)
     v += settings.warp * .75 * noise(nx + 13.7 + .16, ny + 7.1)
@@ -183,8 +184,8 @@ function MeshGradient({ settings, surface, box, idle }: { settings: GradientSett
     const move = (event: PointerEvent) => {
       const rect = stage.getBoundingClientRect()
       if (!rect.width || !rect.height) return
-      const aspect = canvas.width / Math.max(1, canvas.height)
-      target.x = (Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width)) * 2 - 1) * aspect
+      // Same fixed horizontal range whatever the word's width (the field no longer depends on it).
+      target.x = (Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width)) * 2 - 1) * 3.5
       target.y = 1 - Math.max(0, Math.min(1, (event.clientY - rect.top) / rect.height)) * 2
     }
     const render = (time: number) => {
@@ -237,7 +238,7 @@ const parseWords = (text: string) => text.split("\n").map(w => w.trim()).filter(
  * text only (CSS has no inner shadow for text): it inverts the glyph alpha, offsets and blurs it, and keeps
  * only what falls inside the letters.
  */
-export function HighlightFrame({ id, words: contentWords }: { id: string; words: readonly string[] }) {
+export function HighlightFrame({ id, words: contentWords, label, text, heading, intro }: { id: string; words: readonly string[]; label?: string; text?: string; heading?: string; intro?: string }) {
   const g = useGradientSettings()
   const uid = useId().replace(/:/g, "")
   // The panel can override the words (one per line); empty means the About content.
@@ -247,6 +248,9 @@ export function HighlightFrame({ id, words: contentWords }: { id: string; words:
   const track = useRef<HTMLDivElement>(null)
   const frame = useRef<HTMLElement>(null)
   const box = useRef<HTMLSpanElement>(null)
+  const introEl = useRef<HTMLDivElement>(null)
+  // Height of the intro text block; the spacer above the pinned frame is a screen minus this, so the intro sits at the bottom of the first screen.
+  const [introH, setIntroH] = useState(220)
   const idle = useRef(false)
   const live = useRef({ total: timeline.total, sensitivity: g.typeSensitivity, reversible: g.typeReversible })
   const peak = useRef(0) // furthest step reached, for "not reversible"
@@ -273,10 +277,22 @@ export function HighlightFrame({ id, words: contentWords }: { id: string; words:
     return () => { scroller.removeEventListener("scroll", run); window.removeEventListener("resize", run); apply.current = () => {} }
   }, [])
 
+  useEffect(() => {
+    const el = introEl.current
+    if (!el) return
+    const measure = () => setIntroH(Math.round(el.getBoundingClientRect().height))
+    measure()
+    const ro = new ResizeObserver(measure)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [heading, intro])
+
   const state = timeline.stateAt(step)
   useEffect(() => { idle.current = state.text.length === 0 }, [state.text])
 
   return (
+    <>
+    {heading && <div className="section-feature-spacer" aria-hidden="true" style={{ "--intro-h": `${introH}px`, background: g.typeBg } as CSSProperties} />}
     <div ref={track} className="section-feature-track" style={{ height: `calc(100svh + ${timeline.total * g.typeSensitivity}px)` }}>
       <section ref={frame} className="section-feature" aria-label={`${id} highlight`} style={{ background: g.typeBg, "--type-size": `${g.typeSize}px` } as CSSProperties}>
         <svg className="section-feature-defs" width="0" height="0" aria-hidden="true" focusable="false">
@@ -291,6 +307,9 @@ export function HighlightFrame({ id, words: contentWords }: { id: string; words:
           </filter>
         </svg>
         <p className="visually-hidden">{words.join(", ")}</p>
+        {heading && <div ref={introEl} className="section-feature-intro"><h1>{heading}</h1>{intro && <p>{intro}</p>}</div>}
+        {label && <p className="section-feature-label">{label}</p>}
+        <div className="section-feature-main">
         <div className="section-feature-word" aria-hidden="true">
           <div className="section-feature-stage">
             <span ref={box} className="section-feature-bg">
@@ -300,8 +319,11 @@ export function HighlightFrame({ id, words: contentWords }: { id: string; words:
           </div>
           <p style={{ filter: g.shadowEnabled ? `url(#${uid}-shadow)` : undefined, color: g.typeColor, fontWeight: g.typeWeight, letterSpacing: `${g.typeTracking / 100}em`, textTransform: g.typeCase }}>{state.text || "\u200b"}</p>
         </div>
+        {text && <p className="section-feature-text">{text}</p>}
+        </div>
         {g.typeHud && <div className="section-feature-hud" aria-hidden="true">{String(step).padStart(3, "0")} / {String(timeline.total).padStart(3, "0")}  {state.phase}</div>}
       </section>
     </div>
+    </>
   )
 }

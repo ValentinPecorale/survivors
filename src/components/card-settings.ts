@@ -24,6 +24,10 @@ export const defaultCardSettings = {
   /** Cursor orbit (degrees, Camera tab: Horizontal / Vertical orbit) once the scroll camera has arrived. 0 = the view holds still. */
   camCursorHorizontal: 0,
   camCursorVertical: 0,
+  /** Smooth scroll inside an open card: time constant (ms) the content takes to catch up with the wheel. 0 = raw wheel, no smoothing. */
+  scrollSmoothMs: 140,
+  /** Wheel distance multiplier for scrolling inside an open card. */
+  scrollSpeed: 1,
   /** Open by nav button: time for the card to slide from off-screen to fully in. */
   openMs: 1500,
   /** Easing of the open slide. Default is quartic ease-in: accelerates and stops sharply. */
@@ -71,11 +75,7 @@ export function bezierEase(b: Bezier) {
  */
 export const scrollCamera = { progress: 0 }
 
-/**
- * True while any section card is open (written by navbar.tsx, read every frame by hero-scene.tsx).
- * Drives the audio fade: leaving the hero fades sound out and pauses it; coming back fades it in.
- */
-export const sectionAudio = { open: false }
+
 
 let current: CardSettings = defaultCardSettings
 const listeners = new Set<() => void>()
@@ -106,6 +106,8 @@ export function loadCardSettings() {
       camShiftY: num(saved.camShiftY, d.camShiftY, -1, 1),
       camCursorHorizontal: num(saved.camCursorHorizontal, d.camCursorHorizontal, 0, 30),
       camCursorVertical: num(saved.camCursorVertical, d.camCursorVertical, 0, 30),
+      scrollSmoothMs: num(saved.scrollSmoothMs, d.scrollSmoothMs, 0, 600),
+      scrollSpeed: num(saved.scrollSpeed, d.scrollSpeed, 0.25, 3),
       openMs: num(saved.openMs, d.openMs, 100, 5000),
       openEase: isBezier(saved.openEase) ? saved.openEase : d.openEase,
       openDelayMs: num(saved.openDelayMs, d.openDelayMs, 0, 1000),

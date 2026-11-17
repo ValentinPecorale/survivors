@@ -26,16 +26,18 @@ export const defaultGradientSettings = {
   typeHold: 8,         // steps a finished word stays on screen before it is deleted: time to read it
   typeWords: "",       // one word or phrase per line; empty = the words from the About content (Keystatic)
   typeReversible: true, // scrolling back undoes keypresses (off: once typed, it stays)
-  typeSize: 39,        // px
-  typeWeight: 600,
+  typeSize: 47,        // px
+  typeWeight: 700,
   typeTracking: 0,     // em × 100
   typeCase: "none" as "none" | "uppercase" | "lowercase",
   typeColor: "#8e8e8e",
   typeBg: "#0a0a0a",
   typeHud: false,      // small step counter in the corner, for tuning
-  // Skull frame (Figma 8:261): the chrome skull turns as you scroll
-  skullScroll: 200,         // vh of scrolling for the whole rotation (the frame stays pinned that long)
-  skullTurns: 1,            // full turns over that scroll; negative reverses
+  // Skull frame (Figma 8:261): continuous chrome rotation with scroll acceleration
+  skullScroll: 0,           // vh of pinned scrolling; 0 = no pin, the frame scrolls straight past
+  skullSpeed: 3,            // idle revolutions per minute; negative reverses
+  skullBoost: 2,            // added revolutions per minute per 100px/s of scrolling
+  skullDecay: 600,          // milliseconds for scroll boost to lose 95%
   skullSize: 90,            // % of the canvas height the skull fills
   skullColor: "#ffffff",    // same chrome defaults as the hero tiger
   skullRoughness: 0.04,
@@ -46,9 +48,33 @@ export const defaultGradientSettings = {
   listSize: 55,             // px
   listColor: "#414141",     // regular state
   listHover: "#ffffff",     // hover state: also moves in front of the skull
-  listLine: "#414141",      // full-width line behind a hovered name
+  listLine: "#ffffff",      // full-width line behind a hovered name
   listFade: 160,            // ms
   listBg: "#0a0a0a",
+  footerBg: "#000000",
+  footerShapeColor: "#ffffff",
+  footerDepth: 0.16,
+  footerBevel: 0.02,
+  footerRoughness: 0.31,
+  footerHorizontal: 20,
+  footerVertical: 20,
+  footerSettling: 900,
+  footerIdle: 0,
+  footerKey: 2.2,
+  footerLightVersion: 1,
+  footerAzimuth: 0,
+  footerElevation: 0,
+  footerFill: 0.7,
+  footerAmbient: 0.5,
+  footerReflections: 0.15,
+  footerZoom: 100,
+  footerFov: 32,
+  footerOffsetX: 0,
+  footerOffsetY: 0,
+  footerMotion: true, footerInvert: false,
+  footerFinish: "metal" as "metal" | "matte" | "satin" | "glossy",
+  footerProjection: "orthographic" as "orthographic" | "perspective",
+  footerKeyColor: "#ffffff", footerFillColor: "#ffffff",
   // Inner shadow on the word (SVG filter: inverted alpha, offset, blurred, clipped to the glyphs)
   shadowEnabled: true,
   shadowColor: "#000000",
@@ -101,8 +127,10 @@ export function loadGradientSettings() {
       typeColor: hex(s.typeColor, d.typeColor),
       typeBg: hex(s.typeBg, d.typeBg),
       typeHud: typeof s.typeHud === "boolean" ? s.typeHud : d.typeHud,
-      skullScroll: num(s.skullScroll, d.skullScroll, 50, 600),
-      skullTurns: num(s.skullTurns, d.skullTurns, -4, 4),
+      skullScroll: s.skullScroll === 200 ? d.skullScroll : num(s.skullScroll, d.skullScroll, 0, 600), // 200 was the old default: saved presets that never changed it move to the new no-pin default
+      skullSpeed: num(s.skullSpeed, d.skullSpeed, -12, 12),
+      skullBoost: num(s.skullBoost, d.skullBoost, 0, 10),
+      skullDecay: num(s.skullDecay, d.skullDecay, 100, 2000),
       skullSize: num(s.skullSize, d.skullSize, 40, 130),
       skullColor: hex(s.skullColor, d.skullColor),
       skullRoughness: num(s.skullRoughness, d.skullRoughness, 0, 1),
@@ -112,9 +140,34 @@ export function loadGradientSettings() {
       listSize: num(s.listSize, d.listSize, 20, 120),
       listColor: hex(s.listColor, d.listColor),
       listHover: hex(s.listHover, d.listHover),
-      listLine: hex(s.listLine, d.listLine),
+      listLine: s.listLine === "#414141" ? d.listLine : hex(s.listLine, d.listLine),
       listFade: num(s.listFade, d.listFade, 0, 1000),
       listBg: hex(s.listBg, d.listBg),
+      footerBg: hex(s.footerBg, d.footerBg),
+      footerShapeColor: hex(s.footerShapeColor, d.footerShapeColor),
+      footerDepth: num(s.footerDepth, d.footerDepth, 0.01, 0.6),
+      footerBevel: num(s.footerBevel, d.footerBevel, 0, 0.05),
+      footerRoughness: num(s.footerRoughness, d.footerRoughness, 0, 1),
+      footerHorizontal: num(s.footerHorizontal, d.footerHorizontal, 0, 45),
+      footerVertical: num(s.footerVertical, d.footerVertical, 0, 45),
+      footerSettling: num(s.footerSettling, d.footerSettling, 0, 2000),
+      footerIdle: num(s.footerIdle, d.footerIdle, -45, 45),
+      footerKey: num(s.footerKey, d.footerKey, 0, 6),
+      footerLightVersion: d.footerLightVersion,
+      footerAzimuth: s.footerLightVersion === d.footerLightVersion ? num(s.footerAzimuth, d.footerAzimuth, -180, 180) : d.footerAzimuth,
+      footerElevation: s.footerLightVersion === d.footerLightVersion ? num(s.footerElevation, d.footerElevation, -90, 90) : d.footerElevation,
+      footerFill: num(s.footerFill, d.footerFill, 0, 3),
+      footerAmbient: num(s.footerAmbient, d.footerAmbient, 0, 3),
+      footerReflections: num(s.footerReflections, d.footerReflections, 0, 2),
+      footerZoom: num(s.footerZoom, d.footerZoom, 25, 150),
+      footerFov: num(s.footerFov, d.footerFov, 15, 75),
+      footerOffsetX: num(s.footerOffsetX, d.footerOffsetX, -50, 50),
+      footerOffsetY: num(s.footerOffsetY, d.footerOffsetY, -50, 50),
+      footerMotion: typeof s.footerMotion === "boolean" ? s.footerMotion : d.footerMotion,
+      footerInvert: typeof s.footerInvert === "boolean" ? s.footerInvert : d.footerInvert,
+      footerFinish: s.footerFinish === "matte" || s.footerFinish === "satin" || s.footerFinish === "glossy" ? s.footerFinish : "metal",
+      footerProjection: s.footerProjection === "perspective" ? "perspective" : "orthographic",
+      footerKeyColor: hex(s.footerKeyColor, d.footerKeyColor), footerFillColor: hex(s.footerFillColor, d.footerFillColor),
       shadowEnabled: typeof s.shadowEnabled === "boolean" ? s.shadowEnabled : d.shadowEnabled,
       shadowColor: hex(s.shadowColor, d.shadowColor),
       shadowOpacity: num(s.shadowOpacity, d.shadowOpacity, 0, 1),

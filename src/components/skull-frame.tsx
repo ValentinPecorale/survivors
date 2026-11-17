@@ -13,45 +13,57 @@ const webglAvailable = () => {
   try { const c = document.createElement("canvas"); return !!(c.getContext("webgl2") || c.getContext("webgl")) } catch { return false }
 }
 
-/**
- * Figma 8:261 — the client list with the chrome skull in the middle.
- *
- * The frame is pinned (sticky) for `skullScroll` vh of scrolling, and the skull turns `skullTurns` full turns over
- * that distance: scroll down to spin it round once, scroll up to spin it back. The end of this pinned stretch is
- * the end of the About section.
- *
- * Layering, back to front: regular names (grey) → skull → the name under the cursor. A hovered name turns white,
- * gets its full-width line, and comes in front of the skull; leaving puts it back behind. The skull canvas has
- * pointer-events: none, so the names under it stay hoverable.
- */
+/** Chrome skull with continuous rotation and scroll acceleration. */
 export function SkullFrame({ id, clients }: { id: string; clients: readonly string[] }) {
   const g = useGradientSettings()
   const track = useRef<HTMLDivElement>(null)
   const frame = useRef<HTMLElement>(null)
-  const bridge = useRef<SkullBridge>({ angle: 0, invalidate: () => {} })
-  const live = useRef({ scroll: g.skullScroll, turns: g.skullTurns })
-  const apply = useRef<() => void>(() => {})
+  const bridge = useRef<SkullBridge>({ angle: 0, direction: 1, velocity: 0, scrollTime: 0, active: false, invalidate: () => {} })
   const [mount, setMount] = useState(false)
   const [ready, setReady] = useState(false)
   const onReady = useCallback(() => setReady(true), [])
 
-  // Scroll position → rotation. Native scrolling, no input captured.
-  useEffect(() => { live.current = { scroll: g.skullScroll, turns: g.skullTurns }; apply.current() }, [g.skullScroll, g.skullTurns])
+  // Keep motion outside React state; only the visible frame requests animation frames.
   useEffect(() => {
-    const trackEl = track.current
-    const scroller = trackEl?.closest<HTMLElement>(".site-card")
-    if (!trackEl || !scroller) return
-    const run = () => {
-      const { scroll, turns } = live.current
-      const progress = Math.min(1, Math.max(0, (scroller.scrollTop - trackEl.offsetTop) / Math.max(1, scroller.clientHeight * scroll / 100)))
-      bridge.current.angle = progress * turns * Math.PI * 2
-      bridge.current.invalidate()
+    const el = frame.current
+    const scroller = el?.closest<HTMLElement>(".site-card")
+    if (!el || !scroller) return
+    const shared = bridge.current
+    const reduced = window.matchMedia("(prefers-reduced-motion: reduce)")
+    let visible = false
+    let lastTop = scroller.scrollTop
+    let lastTime = performance.now()
+    const sync = () => {
+      shared.active = visible && !document.hidden && !reduced.matches
+      shared.velocity = 0
+      lastTop = scroller.scrollTop
+      lastTime = performance.now()
+      shared.invalidate()
     }
-    apply.current = run
-    run()
-    scroller.addEventListener("scroll", run, { passive: true })
-    window.addEventListener("resize", run)
-    return () => { scroller.removeEventListener("scroll", run); window.removeEventListener("resize", run); apply.current = () => {} }
+    const observer = new IntersectionObserver(([entry]) => { visible = entry.isIntersecting; sync() })
+    observer.observe(el)
+    const scroll = () => {
+      const now = performance.now()
+      if (shared.active) {
+        const distance = scroller.scrollTop - lastTop
+        if (distance !== 0) shared.direction = distance > 0 ? 1 : -1
+        shared.velocity = Math.min(3000, Math.abs(distance) / Math.max(16, now - lastTime) * 1000)
+        shared.scrollTime = now
+        shared.invalidate()
+      }
+      lastTop = scroller.scrollTop
+      lastTime = now
+    }
+    scroller.addEventListener("scroll", scroll, { passive: true })
+    document.addEventListener("visibilitychange", sync)
+    reduced.addEventListener("change", sync)
+    return () => {
+      shared.active = false
+      observer.disconnect()
+      scroller.removeEventListener("scroll", scroll)
+      document.removeEventListener("visibilitychange", sync)
+      reduced.removeEventListener("change", sync)
+    }
   }, [])
 
   // Mount the canvas (and fetch Three.js, the GLB and the HDR) once the frame is within one screen.
@@ -69,7 +81,7 @@ export function SkullFrame({ id, clients }: { id: string; clients: readonly stri
 
   return (
     <div ref={track} className="skull-track" style={{ height: `calc(100svh + ${g.skullScroll}svh)` }}>
-      <section ref={frame} className="skull-frame" aria-label={`${id} clients`}
+      <section id="clients" ref={frame} className="skull-frame" aria-label={`${id} clients`}
         style={{ background: g.listBg, "--list-size": `${g.listSize}px`, "--list-color": g.listColor, "--list-hover": g.listHover, "--list-line": g.listLine, "--list-fade": `${g.listFade}ms` } as CSSProperties}>
         <ul className="client-list">
           {clients.map(name => <li key={name}>{name}</li>)}

@@ -2,6 +2,7 @@
 
 import dynamic from "next/dynamic"
 import Image from "next/image"
+import { unlockAudio, updateAmbient } from "./sound"
 import { SettingsPreset } from "./settings-preset"
 import { useHeldKey } from "./held-key"
 import { PropertiesPanel } from "./properties-panel"
@@ -20,6 +21,19 @@ const HeroScene = dynamic(() => import("./hero-scene"), { ssr: false })
 export function Hero() {
   const [ascii, setAscii] = useState(defaultAscii)
   const [model, setModel] = useState(defaultModel)
+  useEffect(() => {
+    const update = () => updateAmbient(true, model.ambientVolume, model.ambientTrack)
+    const unlock = () => { unlockAudio(); update() }
+    update()
+    const timer = window.setInterval(update, 500)
+    window.addEventListener("pointerdown", unlock)
+    window.addEventListener("keydown", unlock)
+    return () => {
+      window.clearInterval(timer)
+      window.removeEventListener("pointerdown", unlock)
+      window.removeEventListener("keydown", unlock)
+    }
+  }, [model.ambientVolume, model.ambientTrack])
   const [gpu, setGpu] = useState<"checking" | "yes" | "no">("checking")
 
   useEffect(() => {

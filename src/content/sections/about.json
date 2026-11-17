@@ -1,6 +1,11 @@
 {
   "heading": "We make things to last.",
-  "text": "Everything on the internet is starting to look the same. We’re a design studio bringing humanity back to brands and screens. Every project carries a piece of the people behind it, and that’s why it survives. We build visual identities, websites, AI photo studios and design systems that don’t feel like templates, because they aren’t.",
+  "text": "We’re a design studio bringing humanity back to brands and screens. Every project carries a piece of the people behind it, so when we’re gone, it stays. That’s why it survives.",
+  "whatLabel": "What we do",
+  "whatText": "We design brands and build what they need to grow. That means visual identities with a clear point of view, custom AI photo studios that create on-brand imagery on demand, design systems your AI agents can follow, and websites designed with care and built to perform.",
   "words": ["Branding", "Websites", "Interior Design", "AI Photo Studio"],
+  "whoLabel": "Who we are",
+  "whoText": "We’re a small studio from Mar del Plata, a city by the sea, made up of people who care a little too much about the details. We’re designers and builders, curious by nature and stubborn about craft. We’d rather make one thing that lasts than ten that disappear, and we put a piece of ourselves into all of it.",
+  "whoTag": "We are survivors.",
   "clients": ["Oberá", "La Posada Del Tano", "Quiero Mis Redes", "Becerro Inmobiliaria"]
 }

@@ -30,6 +30,15 @@ const FOOT_LIFT = 8
 /** First paw contact in each stride (hind-left, measured from the GLB). The strong beat is aligned to it. */
 const STRIDE_HIT = 0.104
 
+const listeners = new Set<() => void>()
+const emit = () => listeners.forEach(listener => listener())
+export const subscribeAudio = (listener: () => void) => { listeners.add(listener); return () => { listeners.delete(listener) } }
+export const getAudioPlaying = () => !!ctx && ctx.state === "running" && !gated && !!ambient
+export const getServerAudioPlaying = () => false
+export function toggleAudio() {
+  if (getAudioPlaying()) setAudioGate(true, 0.08, 0.15)
+  else { setAudioGate(false, 0.08, 0.15); unlockAudio() }
+}
 let ctx: AudioContext | null = null
 const buffers: Record<string, AudioBuffer | Promise<AudioBuffer | null> | null> = {}
 
@@ -39,11 +48,12 @@ function context() {
     const Ctor = window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext
     if (!Ctor) return null
     ctx = new Ctor()
+    ctx.addEventListener("statechange", emit)
   }
   return ctx
 }
 
-/** Every sound goes through this one gain, so the section fade is a single ramp. */
+/** Every sound passes through the navbar playback gate. */
 let bus: GainNode | null = null
 function output(c: AudioContext) {
   if (!bus) { bus = c.createGain(); bus.connect(c.destination) }
@@ -53,13 +63,13 @@ function output(c: AudioContext) {
 let gated = false
 let gateTimer = 0
 /**
- * Section gate. closed=true (a section card is open): ramp everything down over fadeOut seconds, then suspend
- * the AudioContext so nothing plays or runs. closed=false: resume, ramp back up over fadeIn seconds. Music and
- * footsteps continue where they left off, because the context's clock itself was paused.
+ * User playback gate: fade down and suspend the shared context on pause.
+ * Resume continues at the same audio position across every route.
  */
 export function setAudioGate(closed: boolean, fadeOut: number, fadeIn: number) {
   if (closed === gated) return
   gated = closed
+  emit()
   const c = ctx
   if (!c) return // nothing has played yet; the flag alone decides whether unlockAudio may start it
   const gain = output(c).gain
@@ -77,14 +87,14 @@ export function setAudioGate(closed: boolean, fadeOut: number, fadeIn: number) {
       gain.cancelScheduledValues(now)
       gain.setValueAtTime(gain.value, now)
       gain.linearRampToValueAtTime(1, now + Math.max(0.05, fadeIn))
-    })
+    }).catch(() => {})
   }
 }
 
 /** Call from a user gesture (panel toggle, or the first click/key afterwards) or browsers keep audio suspended. */
 export function unlockAudio() {
   const c = context()
-  if (c && c.state === "suspended" && !gated) void c.resume()
+  if (c && c.state === "suspended" && !gated) void c.resume().catch(() => {})
 }
 
 /** Returns the decoded buffer, or null while it is still downloading/decoding (the next call picks it up). */
@@ -106,6 +116,7 @@ function fadeOutAmbient(c: AudioContext) {
   if (!ambient) return
   const { source, gain } = ambient
   ambient = null
+  emit()
   gain.gain.cancelScheduledValues(c.currentTime)
   gain.gain.setTargetAtTime(0.0001, c.currentTime, 0.4)
   source.stop(c.currentTime + 2)
@@ -127,6 +138,7 @@ export function updateAmbient(enabled: boolean, volume: number, track: string) {
       source.connect(gain).connect(output(c))
       source.start()
       ambient = { id: def.url, source, gain }
+      emit()
     }
     ambient.gain.gain.setTargetAtTime(volume * volume * def.trim, c.currentTime, 0.5) // squared: the slider feels even in loudness
   } else fadeOutAmbient(c)

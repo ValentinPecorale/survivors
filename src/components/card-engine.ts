@@ -3,8 +3,8 @@
  * 1 = fully covering). Two things move it:
  *
  *  - tween: timed slide (nav button / close). Eased, fixed duration.
- *  - scrub: scroll or swipe. Linear 1:1 with the gesture (only a short
- *    exponential follow smooths mouse-wheel notches), no timing at all.
+ *  - scrub: scroll or swipe. Linear 1:1 with the gesture (only a critically damped
+ *    spring smooths mouse-wheel notches), no timing at all.
  *
  * Positions are written straight to element transforms in a rAF loop, so a
  * scroll gesture never triggers a React render per frame.
@@ -17,6 +17,7 @@ export type Card<Id extends string = string> = { key: number; id: Id; closing: b
 
 type Motion = {
   p: number
+  velocity: number
   target: number | null
   scrubbed: boolean
   tween: { from: number; to: number; start: number; delay: number; dur: number; onDone: () => void; onEarly?: () => void; early?: boolean; ease?: (t: number) => number } | null
@@ -26,6 +27,8 @@ type Motion = {
 export const SLIDE_MS = 1500
 /** Follow time constant for scrubbing: ~90ms glides wheel notches without adding easing. */
 const SMOOTH_MS = 90
+/** Critically damped card follower: ~395ms to 95%, no spring bounce. */
+const SCROLL_OMEGA = 12
 const MIN_TWEEN = 0.35
 
 /** Ease-in only (quartic): the card accelerates all the way and stops sharply at full speed, no ease-out. */
@@ -40,7 +43,7 @@ export function createCardEngine<Id extends string>(order: readonly Id[], onChan
   let last = 0
   const motion = new Map<number, Motion>()
   const els = new Map<number, HTMLElement>()
-  if (initialId) motion.set(0, { p: 1, target: null, scrubbed: false, tween: null })
+  if (initialId) motion.set(0, { p: 1, velocity: 0, target: null, scrubbed: false, tween: null })
 
   const reduced = () => window.matchMedia("(prefers-reduced-motion: reduce)").matches
   const commit = (next: Card<Id>[]) => { cards = next; onChange(next) }
@@ -80,11 +83,21 @@ export function createCardEngine<Id extends string>(order: readonly Id[], onChan
       } else if (m.target !== null) {
         const diff = m.target - m.p
         if (Math.abs(diff) < 0.0005) {
+          m.velocity = 0
           m.p = m.target
           m.target = null
           if (m.p === 0 && m.scrubbed) { remove(key); continue }
         } else {
-          m.p += diff * (1 - Math.exp(-dt / SMOOTH_MS))
+          // Exact critically damped integration is stable across frame rates.
+          const seconds = dt / 1000
+          const offset = m.p - m.target
+          const impulse = m.velocity + SCROLL_OMEGA * offset
+          const decay = Math.exp(-SCROLL_OMEGA * seconds)
+          const next = m.target + (offset + impulse * seconds) * decay
+          m.velocity = (m.velocity - SCROLL_OMEGA * impulse * seconds) * decay
+          // A reversal may carry momentum across the new target; stop there.
+          if ((m.target - next) * diff < 0) { m.p = m.target; m.velocity = 0 }
+          else m.p = clamp01(next)
           active = true
         }
       }
@@ -109,6 +122,7 @@ export function createCardEngine<Id extends string>(order: readonly Id[], onChan
   const tweenTo = (key: number, to: number, opts: { delay?: number; full?: boolean; ms?: number; ease?: (t: number) => number; onDone: () => void; onEarly?: () => void }) => {
     const m = motion.get(key)
     if (!m) return
+    m.velocity = 0
     m.target = null
     m.tween = { from: m.p, to, start: performance.now(), delay: opts.delay ?? (opts.full ? getCardSettings().openDelayMs : 0), dur: opts.ms ?? (opts.full ? getCardSettings().openMs : SLIDE_MS * Math.max(MIN_TWEEN, Math.abs(to - m.p))), onDone: opts.onDone, onEarly: opts.onEarly, ease: opts.ease ?? (opts.full ? bezierEase(getCardSettings().openEase) : undefined) }
   }
@@ -118,7 +132,7 @@ export function createCardEngine<Id extends string>(order: readonly Id[], onChan
     const key = nextKey++
     const previous = cards.find(c => !c.closing && c.id === id)
     if (previous) motion.delete(previous.key)
-    motion.set(key, { p: 0, target: null, scrubbed: false, tween: null })
+    motion.set(key, { p: 0, velocity: 0, target: null, scrubbed: false, tween: null })
     return { key, next: [...cards.filter(c => c.closing || c.id !== id), { key, id, closing: false, entering: false } as Card<Id>] }
   }
 
