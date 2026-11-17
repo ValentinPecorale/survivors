@@ -37,6 +37,7 @@ function readDefaultSettings(): SavedSettings | null {
     // Introduce the requested 0.20 resting white point to presets saved before hover existed.
     if (saved.ascii.hoverEnabled === undefined) ascii.signalWhitePoint = 0.2
     const model = mergeSettings(defaultModel, saved.model)
+    if (saved.model.audioPresetVersion !== 1) { model.ambientSound = true; model.audioPresetVersion = 1 }
     // Older presets had a single fixed column count; preserve that look.
     if (saved.model.textAsciiEndColumns === undefined) model.textAsciiEndColumns = model.textAsciiColumns
     // Apply the supplied Shader Lab look once without resetting scene/camera placement.

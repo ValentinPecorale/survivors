@@ -17,7 +17,7 @@ import type { GradientSettings } from "./gradient-settings"
  * defaults (colour #fff, roughness 0.04, metalness 1). Only the renderer differs: this canvas is plain WebGL, so
  * it works in browsers that fall back to the static poster in the hero.
  *
- * frameloop="demand": nothing renders unless the scroll moves the rotation or a setting changes.
+ * Demand rendering continues only while visible motion is active.
  */
 
 const SKULL_URL = "/models/skull.glb"
@@ -30,8 +30,8 @@ const FIT = 0.925
 /** Radians to turn skull_web.glb so its face points at the camera at rotation 0. */
 const FRONT = Math.PI * 1.5
 
-/** Mutable bridge between the scrolling frame (writes angle) and the canvas (reads it, then renders). */
-export type SkullBridge = { angle: number; invalidate: () => void }
+/** Mutable bridge between the scrolling frame (writes velocity/direction) and the canvas (integrates rotation). */
+export type SkullBridge = { angle: number; direction: 1 | -1; velocity: number; scrollTime: number; active: boolean; invalidate: () => void }
 
 type Props = { settings: GradientSettings; bridge: { current: SkullBridge }; onReady: () => void }
 
@@ -70,10 +70,19 @@ function Skull({ settings, bridge, onReady }: Props) {
     turn.setFromAxisAngle(axis, THREE.MathUtils.degToRad(settings.skullStudioRotation)).premultiply(alignment)
     material.envMapRotation.setFromQuaternion(turn)
     invalidate()
-  }, [material, normalization, alignment, turn, axis, invalidate, settings.skullColor, settings.skullRoughness, settings.skullMetalness, settings.skullLight, settings.skullStudioRotation, settings.skullSize])
+  }, [material, normalization, alignment, turn, axis, invalidate, settings.skullColor, settings.skullRoughness, settings.skullMetalness, settings.skullLight, settings.skullStudioRotation, settings.skullSize, settings.skullSpeed, settings.skullBoost, settings.skullDecay])
 
   // The file's front is 270° round from the camera, so offset it: at the start of the scroll the skull faces you.
-  useFrame(() => { if (group.current) group.current.rotation.y = bridge.current.angle + FRONT })
+  useFrame((_, delta) => {
+    const motion = bridge.current
+    const boost = Math.min(30, motion.velocity / 100 * settings.skullBoost) * Math.exp(-3 * (performance.now() - motion.scrollTime) / settings.skullDecay)
+    if (motion.active) {
+      const rpm = motion.direction * (settings.skullSpeed < 0 ? -1 : 1) * (Math.abs(settings.skullSpeed) + boost)
+      motion.angle = (motion.angle + rpm * Math.PI / 30 * Math.min(delta, 0.05)) % (Math.PI * 2)
+      if (settings.skullSpeed !== 0 || boost > 0.001) invalidate()
+    }
+    if (group.current) group.current.rotation.y = motion.angle + FRONT
+  })
 
   // Fits the skull's 6.08-unit height to skullSize% of the canvas at the camera distance set below (90% by default).
   return <group ref={group} scale={settings.skullSize / 90 * FIT}><primitive object={scene} /></group>

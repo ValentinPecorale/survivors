@@ -5,8 +5,9 @@ import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import { sections, sectionFromPath, SectionContent, type SectionId } from "./sections"
 import { createCardEngine } from "./card-engine"
-import { loadCardSettings, sectionAudio, useCardSettings } from "./card-settings"
+import { loadCardSettings, useCardSettings } from "./card-settings"
 import { loadGradientSettings } from "./gradient-settings"
+import { SoundToggle } from "./sound-toggle"
 import { SHORTCUT_KEYS } from "./shortcuts"
 
 /** Scroll distance for one full slide, as a fraction of viewport height. 1:1 and linear. */
@@ -58,6 +59,27 @@ export function Navbar({ children }: { children: ReactNode }) {
   }, [pathname, engine])
   useEffect(() => () => engine.destroy(), [engine])
 
+  useEffect(() => {
+    let raf = 0
+    const showClients = () => {
+      cancelAnimationFrame(raf)
+      engine.open("about")
+      const deadline = performance.now() + 8000
+      const locate = () => {
+        const target = document.querySelector<HTMLElement>(".site-card:not([inert]) #clients")
+        const card = target?.closest<HTMLElement>(".site-card")
+        if (target && card && engine.frontSettled()) {
+          card.scrollTop += target.getBoundingClientRect().top - card.getBoundingClientRect().top
+          return
+        }
+        if (performance.now() < deadline) raf = requestAnimationFrame(locate)
+      }
+      raf = requestAnimationFrame(locate)
+    }
+    window.addEventListener("survivors:show-clients", showClients)
+    return () => { cancelAnimationFrame(raf); window.removeEventListener("survivors:show-clients", showClients) }
+  }, [engine])
+
   const { openMs, openDelayMs } = useCardSettings()
   useEffect(() => { loadCardSettings(); loadGradientSettings() }, [])
   const locked = cards.some(c => c.entering)
@@ -71,7 +93,7 @@ export function Navbar({ children }: { children: ReactNode }) {
   const live = cards.filter(c => !c.closing)
   const top = live[live.length - 1]
   const hasCards = live.length > 0
-  useEffect(() => { sectionAudio.open = hasCards }, [hasCards])
+
 
   useEffect(() => {
     if (!hasCards) return
@@ -96,37 +118,17 @@ export function Navbar({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const touch = { y: null as number | null }
-    // A section taller than the screen is a scroll container. Passing on to the next section is forbidden until
-    // its content has been scrolled to the end, and then only after resting there for END_DWELL ms.
-    // "Reached" (target = 1), not "settled": a card takes ~0.7s to glide in, and in that window a quick wheel
-    // notch used to skip the section's content and open the next section behind it.
-    const END_DWELL = 350
-    const seen = { el: null as HTMLElement | null, top: 0, movedAt: 0 }
-    /** True when the front card is taller than the screen and is still scrolling, has room to, or has not rested at its end yet. */
-    const cardCanScroll = (direction: 1 | -1) => {
-      if (!engine.frontReached()) return false
+    // Route input explicitly: wheel momentum can remain targeted at the outgoing
+    // card, so native scrolling alone cannot reliably reach the newly active card.
+    const scrollContent = (pixels: number, apply = true) => {
+      if (!engine.frontSettled()) return false
       const front = Array.from(document.querySelectorAll<HTMLElement>(".site-card:not([data-closing])")).pop()
-      if (!front || front.scrollHeight <= front.clientHeight + 1) return false
-      if (seen.el !== front) { seen.el = front; seen.top = front.scrollTop; seen.movedAt = 0 }
-      const now = performance.now()
-      // The browser may scroll before or after this runs; either way, a changed scrollTop means the card moved.
-      if (front.scrollTop !== seen.top) { seen.top = front.scrollTop; seen.movedAt = now; return true }
-      const room = direction > 0 ? front.scrollTop + front.clientHeight < front.scrollHeight - 1 : front.scrollTop > 0
-      if (room) { seen.movedAt = now; return true }
-      return now - seen.movedAt < END_DWELL
-    }
-    // One gesture = a run of wheel events with gaps under GESTURE_GAP ms (momentum included), or one touch.
-    // Leaving a section needs a fresh gesture: if this gesture has already scrolled the card, hitting the end
-    // does not carry on into the next section, however hard the flick. Pause, then scroll again to move on.
-    const GESTURE_GAP = 180
-    const gesture = { at: 0, scrolledCard: false, advanced: false }
-    /** Returns true when the event belongs to the current section (scroll it, or stay put). */
-    const keepOnCard = (direction: 1 | -1, fresh: boolean) => {
-      if (fresh) { gesture.scrolledCard = false; gesture.advanced = false }
-      if (cardCanScroll(direction)) { gesture.scrolledCard = true; return true }
-      // A section is its whole vertical stack of frames. Once this gesture has scrolled it to its end, or has
-      // brought a section into place (opened or closed one) and that has settled, the gesture is spent.
-      return gesture.scrolledCard || (gesture.advanced && engine.frontReached())
+      if (!front) return false
+      const max = front.scrollHeight - front.clientHeight
+      const room = pixels > 0 ? front.scrollTop < max - 1 : front.scrollTop > 1
+      if (!room) return false
+      if (apply) front.scrollTop = Math.max(0, Math.min(max, front.scrollTop + pixels))
+      return true
     }
     const ignored = (target: EventTarget | null) => target instanceof Element && !!target.closest(".properties-panel, .properties-launcher, input, select, textarea")
     const travel = () => window.innerHeight * SCROLL_TRAVEL
@@ -135,26 +137,25 @@ export function Navbar({ children }: { children: ReactNode }) {
       if (event.ctrlKey || ignored(event.target) || Math.abs(event.deltaY) < Math.abs(event.deltaX)) return
       // Normalize line/page wheel modes to pixels.
       const pixels = event.deltaY * (event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? window.innerHeight : 1)
-      const now = performance.now()
-      const fresh = now - gesture.at > GESTURE_GAP
-      gesture.at = now
-      if (keepOnCard(pixels > 0 ? 1 : -1, fresh)) return
-      gesture.advanced = true
+      event.preventDefault()
+      if (!pixels || (engine.frontReached() && !engine.frontSettled()) || scrollContent(pixels)) return
       engine.scrub(pixels / travel())
     }
-    const onTouchStart = (event: TouchEvent) => { touch.y = ignored(event.target) ? null : event.touches[0].clientY; gesture.scrolledCard = false; gesture.advanced = false }
+    const onTouchStart = (event: TouchEvent) => { touch.y = ignored(event.target) ? null : event.touches[0].clientY }
     const onTouchMove = (event: TouchEvent) => {
       if (touch.y === null) return
       const y = event.touches[0].clientY
       const delta = touch.y - y // finger moving up = scrolling down
       touch.y = y
-      if (keepOnCard(delta > 0 ? 1 : -1, false)) return
-      gesture.advanced = true
+      if (event.touches.length !== 1) return
+      if (engine.frontReached() && !engine.frontSettled()) { event.preventDefault(); return }
+      if (!delta || scrollContent(delta, false)) return
+      event.preventDefault()
       engine.scrub(delta / travel())
     }
-    window.addEventListener("wheel", onWheel, { passive: true })
+    window.addEventListener("wheel", onWheel, { passive: false })
     window.addEventListener("touchstart", onTouchStart, { passive: true })
-    window.addEventListener("touchmove", onTouchMove, { passive: true })
+    window.addEventListener("touchmove", onTouchMove, { passive: false })
     return () => {
       window.removeEventListener("wheel", onWheel)
       window.removeEventListener("touchstart", onTouchStart)
@@ -178,6 +179,7 @@ export function Navbar({ children }: { children: ReactNode }) {
             <li>
               <button type="button" aria-keyshortcuts="Space"><span>Contact</span><kbd aria-hidden="true">[SPACE]</kbd></button>
             </li>
+            <li><SoundToggle /></li>
           </ul>
         </nav>
       </header>

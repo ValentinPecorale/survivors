@@ -4,7 +4,7 @@
 
 import { useShaderLabPostProcessingSource } from "@basementstudio/shader-lab"
 import { useAnimations, useGLTF } from "@react-three/drei"
-import { unlockAudio, updateAmbient, updateSteps, hoverMove, hoverStop, preloadHover, setAudioGate } from "./sound"
+import { updateSteps, hoverMove, hoverStop, preloadHover } from "./sound"
 import { createPlantPicker } from "./plant-hover"
 import { Canvas, createPortal, useFrame, useThree } from "@react-three/fiber"
 import { useEffect, useLayoutEffect, useMemo, useRef } from "react"
@@ -16,7 +16,7 @@ import landingKeys from "./camera-landing.json"
 import { projectedBounds, type TigerFrame } from "./camera-framing"
 import { useAsciiHover } from "./ascii-hover"
 import { Tiger } from "./tiger"
-import { getCardSettings, scrollCamera, sectionAudio } from "../card-settings"
+import { getCardSettings, scrollCamera } from "../card-settings"
 import { asciiConfig, columnsFor } from "./ascii-config"
 import { FloorText } from "./floor-text"
 
@@ -146,13 +146,6 @@ function Plants({ settings, orbitTarget, subjectFrame }: { settings: ModelSettin
     return () => { originals.forEach((material, mesh) => { mesh.material = material }); created.forEach(material => material.dispose()) }
   }, [scene, settings.material, settings.wireframe])
   useEffect(() => { if (settings.spin === 0) spin.current = 0 }, [settings.spin])
-  // A saved preset can start with sound on; browsers keep audio locked until the first gesture.
-  useEffect(() => {
-    if (!settings.stepSound && !settings.ambientSound && !settings.hoverSound) return
-    const unlock = () => unlockAudio()
-    window.addEventListener("pointerdown", unlock, { once: true }); window.addEventListener("keydown", unlock, { once: true })
-    return () => { window.removeEventListener("pointerdown", unlock); window.removeEventListener("keydown", unlock) }
-  }, [settings.stepSound, settings.ambientSound, settings.hoverSound])
   // Plant hover rustle: one ray per animation frame at most, only while the pointer moves.
   const getState = useThree(s => s.get)
   const hoverVolume = useRef(settings.hoverVolume)
@@ -194,15 +187,7 @@ function Plants({ settings, orbitTarget, subjectFrame }: { settings: ModelSettin
       picker.dispose()
     }
   }, [scene, canvas, getState, settings.hoverSound])
-  useEffect(() => {
-    updateAmbient(settings.ambientSound, settings.ambientVolume, settings.ambientTrack)
-    // Re-poll while enabled: picks up the file once decoded, or the context once unlocked.
-    const poll = settings.ambientSound ? window.setInterval(() => updateAmbient(true, settings.ambientVolume, settings.ambientTrack), 500) : 0
-    return () => { if (poll) window.clearInterval(poll) }
-  }, [settings.ambientSound, settings.ambientVolume, settings.ambientTrack])
   useFrame((_, delta) => {
-    // Leaving the hero for a section fades all sound out and pauses it; returning fades it back in.
-    setAudioGate(settings.sectionFade && sectionAudio.open, settings.sectionFadeOut, settings.sectionFadeIn)
     // Recorded footsteps, phase-locked to the clip clock (see sound.ts). Ping-pong reverses time, so it stays silent there.
     updateSteps({ enabled: settings.stepSound && settings.repeat !== "pingpong", playing: settings.playing, volume: settings.stepVolume, speed: settings.speed, clipTime: clip?.time ?? 0, offset: settings.stepOffset })
     const state = cursor.current

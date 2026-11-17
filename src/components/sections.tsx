@@ -1,3 +1,4 @@
+import { SectionFooter } from "./section-footer"
 import { HighlightFrame } from "./highlight-gradient"
 import { SkullFrame } from "./skull-frame"
 import { SHORTCUT_KEYS } from "./shortcuts"
@@ -27,5 +28,16 @@ export function SectionContent({ id }: { id: SectionId }) {
     </section>
     {"words" in entry && entry.words.length > 0 && <HighlightFrame id={id} words={entry.words} />}
     {"clients" in entry && entry.clients.length > 0 && <SkullFrame id={id} clients={entry.clients} />}
+    {["Space for ideas", "A closer look", "More to come"].map((heading, index) => (
+      <section className="scroll-placeholder" key={heading} aria-label={`${id} placeholder ${index + 1}`}>
+        <div className="scroll-placeholder-meta"><span>{id}</span><span>Placeholder · 0{index + 1} / 03</span></div>
+        <h2>{heading}.</h2>
+        <div className="scroll-placeholder-footer">
+          <p>Room for the next part of our story.</p>
+          <span>{index < 2 ? "Keep scrolling ↓" : "End of this page"}</span>
+        </div>
+      </section>
+    ))}
+    <SectionFooter />
   </>
 }

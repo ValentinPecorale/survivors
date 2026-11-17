@@ -184,12 +184,6 @@ export function PropertiesPanel({ ascii, model, onAscii, onModel, status }: Prop
             <p className="property-help">Pause to hold a frame. Seek to move through the animation.</p>
           </Group>
           <Group title="Sound">
-            <Toggle label="Fade out on sections" value={model.sectionFade} onChange={v => m("sectionFade", v)} />
-            {model.sectionFade && <>
-              {mr("Fade out · seconds", "sectionFadeOut", 0.1, 3, 0.1)}
-              {mr("Fade in · seconds", "sectionFadeIn", 0.1, 3, 0.1)}
-            </>}
-            <Toggle label="Music" value={model.ambientSound} onChange={v => { if (v) unlockAudio(); m("ambientSound", v) }} />
             <Select label="Song" value={model.ambientTrack} options={Object.entries(TRACKS).map(([id, t]) => [id, t.label] as [string, string])} onChange={v => m("ambientTrack", v)} />
             {mr("Music volume", "ambientVolume", 0, 1)}
             <Toggle label="Plant hover sound" value={model.hoverSound} onChange={v => { if (v) unlockAudio(); m("hoverSound", v) }} />
@@ -198,7 +192,7 @@ export function PropertiesPanel({ ascii, model, onAscii, onModel, status }: Prop
             <Toggle label="Tiger footsteps" value={model.stepSound} onChange={v => { if (v) unlockAudio(); m("stepSound", v) }} />
             {mr("Footsteps volume", "stepVolume", 0, 1)}
             {mr("Footsteps sync · seconds", "stepOffset", -0.2, 0.2, 0.01)}
-            <p className="property-help">All sounds are off by default; browsers only allow audio after a click. The hover sound plays only while the cursor is moving over a tree, plant or grass head (exact silhouette, not a box) and follows cursor speed; hold still and it stops. Footsteps are retimed to the stride, so they follow Speed, Play and Seek (silent in ping-pong). Nudge sync if the thuds land early or late against the paws. Use Save as default to keep your levels.</p>
+            <p className="property-help">Music loops across all pages after the first click or keypress. The navbar speaker pauses/resumes all audio. The hover sound plays only while the cursor is moving over a tree, plant or grass head (exact silhouette, not a box) and follows cursor speed; hold still and it stops. Footsteps are retimed to the stride, so they follow Speed, Play and Seek (silent in ping-pong). Nudge sync if the thuds land early or late against the paws. Use Save as default to keep your levels.</p>
           </Group>
           <Group title="Environment material">
             <Select label="Material" value={model.material} options={[["original", "Original"], ["clay", "Clay"], ["normal", "Normals"]]} onChange={v => m("material", v)} />
@@ -268,11 +262,13 @@ export function PropertiesPanel({ ascii, model, onAscii, onModel, status }: Prop
             <Color label="Frame background" value={gradient.typeBg} onChange={v => gr("typeBg", v)} />
             <p className="property-help">Font stays Geist. The gradient and the inner shadow follow the text size.</p>
           </Group>
-          <Group title="Skull · scroll">
-            <Range label="Scroll per rotation · vh" value={gradient.skullScroll} min={50} max={600} step={10} onChange={v => gr("skullScroll", v)} />
-            <Range label="Turns" value={gradient.skullTurns} min={-4} max={4} step={0.25} onChange={v => gr("skullTurns", v)} />
+          <Group title="Skull · motion">
+            <Range label="Pinned scroll · vh" value={gradient.skullScroll} min={50} max={600} step={10} onChange={v => gr("skullScroll", v)} />
+            <Range label="Auto spin · RPM" value={gradient.skullSpeed} min={-12} max={12} step={0.5} onChange={v => gr("skullSpeed", v)} />
+            <Range label="Scroll boost · RPM / 100px/s" value={gradient.skullBoost} min={0} max={10} step={0.25} onChange={v => gr("skullBoost", v)} />
+            <Range label="Boost settle · ms" value={gradient.skullDecay} min={100} max={2000} step={50} onChange={v => gr("skullDecay", v)} />
             <Range label="Skull size · %" value={gradient.skullSize} min={40} max={130} step={1} onChange={v => gr("skullSize", v)} />
-            <p className="property-help">The frame stays pinned for this much scrolling while the skull turns; scroll back to turn it back. One turn is the full 360°. A negative value spins the other way. The end of this stretch is the end of About.</p>
+            <p className="property-help">The skull spins continuously. Scroll down to spin forward; scroll up to reverse. Scrolling adds speed (capped at 30 extra RPM), then settles to idle in the last direction. Negative RPM flips both directions; zero stops the idle spin. Motion pauses offscreen and with reduced motion enabled.</p>
           </Group>
           <Group title="Skull · material">
             <Color label="Chrome color" value={gradient.skullColor} onChange={v => gr("skullColor", v)} />
@@ -281,6 +277,43 @@ export function PropertiesPanel({ ascii, model, onAscii, onModel, status }: Prop
             <Range label="Studio light" value={gradient.skullLight} min={0} max={3} onChange={v => gr("skullLight", v)} />
             <Range label="Studio rotation" value={gradient.skullStudioRotation} min={-180} max={180} step={1} onChange={v => gr("skullStudioRotation", v)} />
             <p className="property-help">Starts identical to the hero tiger chrome (same studio HDR, roughness 0.04, metalness 1, same key light). Change these to tune the skull on its own.</p>
+          </Group>
+          <Group title="Footer">
+            <Color label="Background" value={gradient.footerBg} onChange={v => gr("footerBg", v)} />
+            <Color label="Shape color" value={gradient.footerShapeColor} onChange={v => gr("footerShapeColor", v)} />
+          </Group>
+          <Group title="Footer shape · geometry">
+            <Range label="Depth" value={gradient.footerDepth} min={0.01} max={0.6} step={0.01} onChange={v => gr("footerDepth", v)} />
+            <Range label="Bevel" value={gradient.footerBevel} min={0} max={0.05} step={0.005} onChange={v => gr("footerBevel", v)} />
+          </Group>
+          <Group title="Footer shape · material">
+            <Select label="Finish" value={gradient.footerFinish} options={[["metal", "Metal"], ["matte", "Matte"], ["satin", "Satin"], ["glossy", "Glossy"]]} onChange={v => gr("footerFinish", v as GradientSettings["footerFinish"])} />
+            <Range label="Roughness" value={gradient.footerRoughness} min={0} max={1} step={0.01} onChange={v => gr("footerRoughness", v)} />
+          </Group>
+          <Group title="Footer shape · motion">
+            <Toggle label="Cursor tilt" value={gradient.footerMotion} onChange={v => gr("footerMotion", v)} />
+            <Toggle label="Invert cursor" value={gradient.footerInvert} onChange={v => gr("footerInvert", v)} />
+            <Range label="Horizontal tilt · °" value={gradient.footerHorizontal} min={0} max={45} step={1} onChange={v => gr("footerHorizontal", v)} />
+            <Range label="Vertical tilt · °" value={gradient.footerVertical} min={0} max={45} step={1} onChange={v => gr("footerVertical", v)} />
+            <Range label="Settling · ms" value={gradient.footerSettling} min={0} max={2000} step={50} onChange={v => gr("footerSettling", v)} />
+            <Range label="Idle spin · °/s" value={gradient.footerIdle} min={-45} max={45} step={1} onChange={v => gr("footerIdle", v)} />
+          </Group>
+          <Group title="Footer shape · lighting">
+            <Color label="Key light color" value={gradient.footerKeyColor} onChange={v => gr("footerKeyColor", v)} />
+            <Color label="Fill light color" value={gradient.footerFillColor} onChange={v => gr("footerFillColor", v)} />
+            <Range label="Key intensity" value={gradient.footerKey} min={0} max={6} step={0.1} onChange={v => gr("footerKey", v)} />
+            <Range label="Light azimuth · °" value={gradient.footerAzimuth} min={-180} max={180} step={1} onChange={v => gr("footerAzimuth", v)} />
+            <Range label="Light elevation · °" value={gradient.footerElevation} min={-90} max={90} step={1} onChange={v => gr("footerElevation", v)} />
+            <Range label="Fill intensity" value={gradient.footerFill} min={0} max={3} step={0.1} onChange={v => gr("footerFill", v)} />
+            <Range label="Ambient intensity" value={gradient.footerAmbient} min={0} max={3} step={0.1} onChange={v => gr("footerAmbient", v)} />
+            <Range label="Reflections" value={gradient.footerReflections} min={0} max={2} step={0.05} onChange={v => gr("footerReflections", v)} />
+          </Group>
+          <Group title="Footer shape · camera">
+            <Select label="Projection" value={gradient.footerProjection} options={[["orthographic", "Orthographic"], ["perspective", "Perspective"]]} onChange={v => gr("footerProjection", v as GradientSettings["footerProjection"])} />
+            <Range label="Zoom · %" value={gradient.footerZoom} min={25} max={150} step={1} onChange={v => gr("footerZoom", v)} />
+            <Range label="Perspective FOV · °" value={gradient.footerFov} min={15} max={75} step={1} onChange={v => gr("footerFov", v)} />
+            <Range label="Offset X · %" value={gradient.footerOffsetX} min={-50} max={50} step={1} onChange={v => gr("footerOffsetX", v)} />
+            <Range label="Offset Y · %" value={gradient.footerOffsetY} min={-50} max={50} step={1} onChange={v => gr("footerOffsetY", v)} />
           </Group>
           <Group title="Client list">
             <Range label="Text size · px" value={gradient.listSize} min={20} max={120} step={1} onChange={v => gr("listSize", v)} />
