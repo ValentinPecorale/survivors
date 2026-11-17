@@ -2,10 +2,11 @@
 
 import Image from "next/image"
 import Link from "next/link"
+import RevealText from "./reveal-text"
 import { MeshGradient } from "./footer-shape/mesh-gradient"
 import { useEffect, useId, useRef, useState } from "react"
 
-const settings = { highlight: "#eef6fd", shadow: "#000101", slate: "#58646a", base: "#1a242d", speed: 1, smoothing: 600, size: 100, intensity: 100, warp: 1, softness: 0 }
+const settings = { highlight: "#eef6fd", shadow: "#0a0a0a", slate: "#58646a", base: "#1a242d", speed: 1, smoothing: 600, size: 100, intensity: 100, warp: 1, softness: 0 }
 
 export function SectionFooter() {
   const root = useRef<HTMLElement>(null)
@@ -33,7 +34,7 @@ export function SectionFooter() {
   return <footer ref={root} className="section-footer">
     <div className="footer-nav-space" aria-hidden="true" />
     <div className="footer-top">
-      <p className="footer-tagline">Survivors is more than a brand. It&apos;s a mindset.<br />Built for those who keep moving, push boundaries, and refuse to give up. No matter the odds, we survive.<br />Stay alive. Stay different. Stay a survivor.</p>
+      <RevealText className="footer-tagline" text={"Survivors is more than a brand. It's a mindset.\nBuilt for those who keep moving, push boundaries, and refuse to give up. No matter the odds, we survive.\nStay alive. Stay different. Stay a survivor."} trigger="inView" />
     </div>
     <div ref={gradient} className="footer-gradient">
       {/* The poster canvas always paints (mobile / no WebGL fallback); the live WebGL layer only runs while the footer is on screen. */}
@@ -55,7 +56,7 @@ export function SectionFooter() {
             <div className="footer-socials">
               {([ ["linkedin", 18, 18], ["instagram", 28, 28], ["discord", 18, 13.5] ] as const).map(([name, width, height]) => <button type="button" key={name} disabled aria-label={`${name} — coming soon`}><Image src={`/images/footer/${name}.svg`} alt="" width={width} height={height} /></button>)}
             </div>
-            <p className="type-body">© 2026 Survivors. All rights reserved.</p>
+            <RevealText className="type-body" text="© 2026 Survivors. All rights reserved." trigger="inView" />
           </div>
         </div>
       </div>
@@ -73,9 +74,9 @@ function Label({ children }: { children: string }) {
           <rect width="100%" height="22" fill="#fff" />
           <text x="7" y="11" dominantBaseline="central" fill="#000">{children}</text>
         </mask>
-        <rect width="100%" height="22" fill="#000" mask={`url(#${id})`} />
+        <rect width="100%" height="22" fill="#0a0a0a" mask={`url(#${id})`} />
       </svg>
     </span>
-    {children}
+    <RevealText as="span" text={children} trigger="inView" />
   </>
 }

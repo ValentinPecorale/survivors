@@ -1,6 +1,7 @@
 "use client"
 
 import dynamic from "next/dynamic"
+import RevealText from "../reveal-text"
 import Image from "next/image"
 import { unlockAudio, updateAmbient } from "./sound"
 import { SettingsPreset } from "./settings-preset"
@@ -57,17 +58,18 @@ export function Hero() {
   const sceneAscii = heldKey ? { ...liveAscii, charset: "custom", customChars: " " + heldKey.key, monoColor: heldKey.color, signalWhitePoint: HELD_WHITE_POINT, hoverWhitePoint: Math.min(liveAscii.hoverWhitePoint, HELD_WHITE_POINT) } : liveAscii
 
   return (
-    <section className="relative h-svh w-full overflow-hidden bg-black">
+    <section className="relative h-svh w-full overflow-hidden bg-[#0a0a0a]">
       <SettingsPreset ascii={liveAscii} model={liveModel} onAscii={setAscii} onModel={setModel} />
-      <div className="absolute inset-0">
+      {/* The scene and the poster render on pure black; lighten against the #0a0a0a section keeps every glyph and lifts only the black. */}
+      <div className="absolute inset-0 mix-blend-lighten">
         {gpu === "no" && <Image src="/models/scene-poster.webp" alt="A running tiger surrounded by an ASCII forest" fill sizes="100vw" className="object-contain" />}
         {gpu === "yes" && <HeroScene ascii={sceneAscii} model={liveModel} onError={() => setGpu("no")} />}
       </div>
       {/* Figma 21:400 — headline bottom-left, services bottom-right; clicks fall through so cursor orbit still works. */}
       <div className="hero-overlay">
-        <h1 className="hero-title">Creating stuff that<br />will survive.</h1>
+        <RevealText as="h1" className="hero-title" text="Creating stuff that will survive." />
         <ul className="hero-services" aria-label="Services">
-          <li>Branding</li><li>Websites</li><li>Interior design</li><li>AI Photo studios</li>
+          {["Branding", "Websites", "Interior design", "AI Photo studios"].map(name => <RevealText as="li" key={name} text={name} />)}
         </ul>
       </div>
       <PropertiesPanel ascii={liveAscii} model={liveModel} onAscii={setAscii} onModel={setModel} status={gpu} />

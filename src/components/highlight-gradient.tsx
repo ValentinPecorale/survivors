@@ -2,6 +2,7 @@
 
 import Image from "next/image"
 import { useEffect, useId, useMemo, useRef, useState, type CSSProperties, type RefObject } from "react"
+import RevealText from "./reveal-text"
 import { useGradientSettings, type GradientSettings } from "./gradient-settings"
 import { buildTimeline } from "./typewriter-timeline"
 
@@ -307,8 +308,8 @@ export function HighlightFrame({ id, words: contentWords, label, text, heading, 
           </filter>
         </svg>
         <p className="visually-hidden">{words.join(", ")}</p>
-        {heading && <div ref={introEl} className="section-feature-intro"><h1>{heading}</h1>{intro && <p>{intro}</p>}</div>}
-        {label && <p className="section-feature-label">{label}</p>}
+        {heading && <div ref={introEl} className="section-feature-intro"><RevealText as="h1" text={heading} trigger="inView" />{intro && <RevealText text={intro} trigger="inView" />}</div>}
+        {label && <RevealText className="section-feature-label" text={label} trigger="inView" />}
         <div className="section-feature-main">
         <div className="section-feature-word" aria-hidden="true">
           <div className="section-feature-stage">
@@ -319,7 +320,7 @@ export function HighlightFrame({ id, words: contentWords, label, text, heading, 
           </div>
           <p style={{ filter: g.shadowEnabled ? `url(#${uid}-shadow)` : undefined, color: g.typeColor, fontWeight: g.typeWeight, letterSpacing: `${g.typeTracking / 100}em`, textTransform: g.typeCase }}>{state.text || "\u200b"}</p>
         </div>
-        {text && <p className="section-feature-text">{text}</p>}
+        {text && <RevealText className="section-feature-text" text={text} trigger="inView" />}
         </div>
         {g.typeHud && <div className="section-feature-hud" aria-hidden="true">{String(step).padStart(3, "0")} / {String(timeline.total).padStart(3, "0")}  {state.phase}</div>}
       </section>

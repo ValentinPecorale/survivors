@@ -11,7 +11,7 @@ import { useSyncExternalStore } from "react"
  */
 export const defaultGradientSettings = {
   // Palette: the four points of the mesh. `highlight` is the one that follows the cursor.
-  highlight: "#eef6fd", shadow: "#000101", slate: "#58646a", base: "#1a242d",
+  highlight: "#eef6fd", shadow: "#0a0a0a", slate: "#58646a", base: "#1a242d",
   // Movement & light
   paused: false,
   speed: 1,        // drift speed multiplier
@@ -51,7 +51,18 @@ export const defaultGradientSettings = {
   listLine: "#ffffff",      // full-width line behind a hovered name
   listFade: 160,            // ms
   listBg: "#0a0a0a",
-  footerBg: "#000000",
+  // Section lines (About): a 2px line with its own gradient running behind it. The line is white where the gradient is white.
+  lineOpacity: 1,
+  lineHighlight: "#eef6fd", lineShadow: "#0a0a0a", lineSlate: "#58646a", lineBase: "#1a242d", // palette; the highlight is the white point the cursor moves
+  linePaused: false,
+  lineSpeed: 1,             // drift speed multiplier
+  lineDelay: 150,           // ms the white point takes to catch up with the cursor; 0 = glued
+  lineRadius: 240,          // px: size of the white point
+  lineIntensity: 100,       // % weight of the white point
+  lineWarp: 0.3,            // domain warp of the field
+  lineFeather: 160,         // softness of the blend (0–230)
+  lineCutoff: 0.45,         // how white the gradient must be for the line to show (higher = only the whitest parts)
+  footerBg: "#0a0a0a",
   footerShapeColor: "#ffffff",
   footerDepth: 0.16,
   footerBevel: 0.02,
@@ -126,6 +137,16 @@ export function loadGradientSettings() {
       typeCase: s.typeCase === "uppercase" || s.typeCase === "lowercase" ? s.typeCase : "none",
       typeColor: hex(s.typeColor, d.typeColor),
       typeBg: hex(s.typeBg, d.typeBg),
+      lineOpacity: num(s.lineOpacity, d.lineOpacity, 0, 1),
+      lineHighlight: hex(s.lineHighlight, d.lineHighlight), lineShadow: hex(s.lineShadow, d.lineShadow), lineSlate: hex(s.lineSlate, d.lineSlate), lineBase: hex(s.lineBase, d.lineBase),
+      linePaused: typeof s.linePaused === "boolean" ? s.linePaused : d.linePaused,
+      lineSpeed: num(s.lineSpeed, d.lineSpeed, 0.25, 3),
+      lineDelay: num(s.lineDelay, d.lineDelay, 0, 1200),
+      lineRadius: num(s.lineRadius, d.lineRadius, 40, 800),
+      lineIntensity: num(s.lineIntensity, d.lineIntensity, 0, 100),
+      lineWarp: num(s.lineWarp, d.lineWarp, 0, 1),
+      lineFeather: num(s.lineFeather, d.lineFeather, 0, 230),
+      lineCutoff: num(s.lineCutoff, d.lineCutoff, 0, 0.9),
       typeHud: typeof s.typeHud === "boolean" ? s.typeHud : d.typeHud,
       skullScroll: s.skullScroll === 200 ? d.skullScroll : num(s.skullScroll, d.skullScroll, 0, 600), // 200 was the old default: saved presets that never changed it move to the new no-pin default
       skullSpeed: num(s.skullSpeed, d.skullSpeed, -12, 12),

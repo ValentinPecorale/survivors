@@ -315,6 +315,26 @@ export function PropertiesPanel({ ascii, model, onAscii, onModel, status }: Prop
             <Range label="Offset X · %" value={gradient.footerOffsetX} min={-50} max={50} step={1} onChange={v => gr("footerOffsetX", v)} />
             <Range label="Offset Y · %" value={gradient.footerOffsetY} min={-50} max={50} step={1} onChange={v => gr("footerOffsetY", v)} />
           </Group>
+          <Group title="Navbar line">
+            <Range label="Opacity" value={gradient.lineOpacity} min={0} max={1} step={0.01} onChange={v => gr("lineOpacity", v)} />
+            <Range label="Cutoff · how white" value={gradient.lineCutoff} min={0} max={0.9} step={0.01} onChange={v => gr("lineCutoff", v)} />
+            <p className="property-help">The 1px line along the bottom of the navbar runs its own gradient, unseen, and shows only where it is white. They work on their own: the white point drifts by itself and your cursor just moves it. Cutoff is how white the gradient has to be for the line to appear, so a higher value leaves only the brightest part.</p>
+          </Group>
+          <Group title="Navbar line · palette">
+            <Color label="White point" value={gradient.lineHighlight} onChange={v => gr("lineHighlight", v)} />
+            <Color label="Midtone" value={gradient.lineSlate} onChange={v => gr("lineSlate", v)} />
+            <Color label="Base" value={gradient.lineBase} onChange={v => gr("lineBase", v)} />
+            <Color label="Shadow" value={gradient.lineShadow} onChange={v => gr("lineShadow", v)} />
+          </Group>
+          <Group title="Navbar line · movement & light">
+            <Toggle label="Drift" value={!gradient.linePaused} onChange={v => gr("linePaused", !v)} />
+            <Range label="Drift speed · ×" value={gradient.lineSpeed} min={0.25} max={3} step={0.05} onChange={v => gr("lineSpeed", v)} />
+            <Range label="Cursor delay · ms" value={gradient.lineDelay} min={0} max={1200} step={10} onChange={v => gr("lineDelay", v)} />
+            <Range label="White point size · px" value={gradient.lineRadius} min={40} max={800} step={10} onChange={v => gr("lineRadius", v)} />
+            <Range label="White point weight · %" value={gradient.lineIntensity} min={0} max={100} step={1} onChange={v => gr("lineIntensity", v)} />
+            <Range label="Mesh warp" value={gradient.lineWarp} min={0} max={1} onChange={v => gr("lineWarp", v)} />
+            <Range label="Blend softness" value={gradient.lineFeather} min={0} max={230} step={10} onChange={v => gr("lineFeather", v)} />
+          </Group>
           <Group title="Client list">
             <Range label="Text size · px" value={gradient.listSize} min={20} max={120} step={1} onChange={v => gr("listSize", v)} />
             <Color label="Regular color" value={gradient.listColor} onChange={v => gr("listColor", v)} />

@@ -8,6 +8,7 @@ import { createCardEngine } from "./card-engine"
 import { getCardSettings, loadCardSettings, useCardSettings } from "./card-settings"
 import { loadGradientSettings } from "./gradient-settings"
 import { SoundToggle } from "./sound-toggle"
+import { SectionLine } from "./section-line"
 import { SHORTCUT_KEYS } from "./shortcuts"
 
 /** Scroll distance for one full slide, as a fraction of viewport height. 1:1 and linear. */
@@ -216,6 +217,7 @@ export function Navbar({ children }: { children: ReactNode }) {
             <li><SoundToggle /></li>
           </ul>
         </nav>
+        <SectionLine className="section-line--abs" style={{ bottom: 0 }} />
       </header>
       {/* Keep the route outlet rendered even when Home has no card. The page
           can return null, but Next still needs to visit its segment boundary. */}

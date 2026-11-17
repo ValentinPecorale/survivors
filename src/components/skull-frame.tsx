@@ -4,6 +4,7 @@ import dynamic from "next/dynamic"
 import Image from "next/image"
 import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react"
 import { useGradientSettings } from "./gradient-settings"
+import RevealText from "./reveal-text"
 import type { SkullBridge } from "./skull-canvas"
 
 // Three.js and the GLB are only fetched when this frame is within a screen of the viewport.
@@ -84,7 +85,7 @@ export function SkullFrame({ id, clients }: { id: string; clients: readonly stri
       <section id="clients" ref={frame} className="skull-frame" aria-label={`${id} clients`}
         style={{ background: g.listBg, "--list-size": `${g.listSize}px`, "--list-color": g.listColor, "--list-hover": g.listHover, "--list-line": g.listLine, "--list-fade": `${g.listFade}ms` } as CSSProperties}>
         <ul className="client-list">
-          {clients.map(name => <li key={name}>{name}</li>)}
+          {clients.map(name => <li key={name}><RevealText as="span" text={name} trigger="inView" /></li>)}
         </ul>
         <div className="skull-stage" data-ready={ready} aria-hidden="true">
           <Image src="/images/skull-poster.webp" alt="" fill sizes="329px" priority={false} />
