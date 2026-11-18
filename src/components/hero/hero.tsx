@@ -3,7 +3,7 @@
 import dynamic from "next/dynamic"
 import RevealText from "../reveal-text"
 import Image from "next/image"
-import { setHoverConfig, unlockAudio, updateAmbient } from "./sound"
+import { unlockAudio, updateAmbient } from "./sound"
 import { SettingsPreset } from "./settings-preset"
 import { useHeldKey } from "./held-key"
 import { PropertiesPanel } from "./properties-panel"
@@ -53,8 +53,6 @@ export function Hero() {
 
   const liveAscii = { ...defaultAscii, ...ascii, ...(ascii.hoverEnabled === undefined ? { signalWhitePoint: 0.2 } : {}) }
   const liveModel = { ...defaultModel, ...model }
-  // Hover sound is shared with the About video slots: publish the panel values where they can read them.
-  useEffect(() => { setHoverConfig({ enabled: liveModel.hoverSound, volume: liveModel.hoverVolume, track: liveModel.hoverTrack }) }, [liveModel.hoverSound, liveModel.hoverVolume, liveModel.hoverTrack])
   // Holding a key re-types the scene in that glyph and in that key's own colour. A leading space keeps the darkest tones empty so the forms still read.
   const heldKey = useHeldKey()
   const sceneAscii = heldKey ? { ...liveAscii, charset: "custom", customChars: " " + heldKey.key, monoColor: heldKey.color, signalWhitePoint: HELD_WHITE_POINT, hoverWhitePoint: Math.min(liveAscii.hoverWhitePoint, HELD_WHITE_POINT) } : liveAscii

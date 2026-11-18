@@ -186,7 +186,7 @@ export function PropertiesPanel({ ascii, model, onAscii, onModel, status }: Prop
           <Group title="Sound">
             <Select label="Song" value={model.ambientTrack} options={Object.entries(TRACKS).map(([id, t]) => [id, t.label] as [string, string])} onChange={v => m("ambientTrack", v)} />
             {mr("Music volume", "ambientVolume", 0, 1)}
-            <Toggle label="Hover sound · plants & videos" value={model.hoverSound} onChange={v => { if (v) unlockAudio(); m("hoverSound", v) }} />
+            <Toggle label="Plant hover sound" value={model.hoverSound} onChange={v => { if (v) unlockAudio(); m("hoverSound", v) }} />
             <Select label="Hover sound" value={model.hoverTrack} options={Object.entries(HOVER_SOUNDS).map(([id, h]) => [id, h.label] as [string, string])} onChange={v => m("hoverTrack", v)} />
             {mr("Hover volume", "hoverVolume", 0, 1)}
             <Toggle label="Tiger footsteps" value={model.stepSound} onChange={v => { if (v) unlockAudio(); m("stepSound", v) }} />
@@ -314,14 +314,6 @@ export function PropertiesPanel({ ascii, model, onAscii, onModel, status }: Prop
             <Range label="Perspective FOV · °" value={gradient.footerFov} min={15} max={75} step={1} onChange={v => gr("footerFov", v)} />
             <Range label="Offset X · %" value={gradient.footerOffsetX} min={-50} max={50} step={1} onChange={v => gr("footerOffsetX", v)} />
             <Range label="Offset Y · %" value={gradient.footerOffsetY} min={-50} max={50} step={1} onChange={v => gr("footerOffsetY", v)} />
-          </Group>
-          <Group title="ASCII videos · glyph hover">
-            <Toggle label="Hover levels" value={gradient.glyphHoverOn} onChange={v => gr("glyphHoverOn", v)} />
-            <Range label="Black point" value={gradient.glyphHoverBlack} min={0} max={1} step={0.01} onChange={v => gr("glyphHoverBlack", v)} />
-            <Range label="White point" value={gradient.glyphHoverWhite} min={0} max={1} step={0.01} onChange={v => gr("glyphHoverWhite", v)} />
-            <Range label="Radius · px" value={gradient.glyphHoverRadius} min={20} max={600} step={5} onChange={v => gr("glyphHoverRadius", v)} />
-            <Range label="Feather · px" value={gradient.glyphHoverFeather} min={0} max={400} step={5} onChange={v => gr("glyphHoverFeather", v)} />
-            <p className="property-help">While the cursor is over an ASCII video slot, the glyphs inside the circle are drawn as if the signal black and white points were these (the slots' own white point is about 0.13, so 1 spreads the glyph ramp over the full range). Radius is where the circle ends, feather how much of it is a soft edge. It updates live and never recompiles the shader.</p>
           </Group>
           <Group title="Navbar line">
             <Range label="Opacity" value={gradient.lineOpacity} min={0} max={1} step={0.01} onChange={v => gr("lineOpacity", v)} />

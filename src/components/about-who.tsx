@@ -3,8 +3,6 @@
 import dynamic from "next/dynamic"
 import { useEffect, useRef, useState, type ComponentType } from "react"
 import RevealText from "./reveal-text"
-import { createSurfaceHover } from "./hero/sound"
-import type { ProbeSetter, SlotApi } from "./ascii-video-runtime"
 
 // Shader Lab (~1MB gz) is only fetched once the first composition is about to mount.
 const AsciiChrome = dynamic(() => import("./ascii-video").then(m => m.AsciiVideo), { ssr: false })
@@ -12,7 +10,7 @@ const AsciiEagle = dynamic(() => import("./ascii-video-eagle").then(m => m.Ascii
 const AsciiOrca = dynamic(() => import("./ascii-video-orca").then(m => m.AsciiVideo), { ssr: false })
 
 /** The three slots, left to right: ASCII compositions (Shader Lab) on the shared cheap runtime. A slot can also take a plain clip with `src`. */
-const SLOTS: { key: string; src?: string; Ascii?: ComponentType<{ onProbe?: ProbeSetter }> }[] = [
+const SLOTS: { key: string; src?: string; Ascii?: ComponentType }[] = [
   { key: "chrome", Ascii: AsciiChrome },
   { key: "eagle", Ascii: AsciiEagle },
   { key: "orca", Ascii: AsciiOrca },
@@ -43,10 +41,6 @@ export function AboutWho({ label, text, tag }: { label: string; text: string; ta
   const cells = useRef<(HTMLDivElement | null)[]>([])
   const clips = useRef<(HTMLVideoElement | null)[]>([])
   const textWrap = useRef<HTMLDivElement>(null)
-  // Each composition hands back an API: glyphAt ("is a glyph drawn here?", for the hover sound) and setHover (cursor position,
-  // for the local black/white point).
-  const probes = useRef<(SlotApi | null)[]>([])
-  const probeSetters = useRef<ProbeSetter[]>(SLOTS.map((_, i) => api => { probes.current[i] = api }))
   const textInner = useRef<HTMLDivElement>(null)
   const [mounted, setMounted] = useState<boolean[]>(() => SLOTS.map(() => false))
   const mountedRef = useRef<boolean[]>(SLOTS.map(() => false))
@@ -88,11 +82,6 @@ export function AboutWho({ label, text, tag }: { label: string; text: string; ta
     // The text block's natural height changes with the width (and when its copy is revealed): re-measure.
     const measure = textInner.current ? new ResizeObserver(schedule) : null
     if (textInner.current) measure?.observe(textInner.current)
-    // Hover sound: the hero's plant sound, played while the pointer moves over a drawn ASCII glyph in a revealed part of a slot (the
-    // clip-path mask also clips hit-testing, so a slot is silent until its reveal reaches the pointer). Same panel settings.
-    const slots = cells.current.map((c, i) => ({ cell: c, hover: createSurfaceHover("grove", (x, y) => probes.current[i]?.glyphAt(x, y) ?? false) })).filter((s): s is { cell: HTMLDivElement; hover: ReturnType<typeof createSurfaceHover> } => !!s.cell)
-    const cursor = slots.map((_, k) => ({ move: (e: PointerEvent) => probes.current[k]?.setHover(e.clientX, e.clientY), leave: () => probes.current[k]?.setHover(null, null) }))
-    slots.forEach(({ cell, hover }, k) => { cell.addEventListener("pointermove", hover.move, { passive: true }); cell.addEventListener("pointerleave", hover.leave); cell.addEventListener("pointermove", cursor[k].move, { passive: true }); cell.addEventListener("pointerleave", cursor[k].leave) })
     // The first composition mounts once the frame is within a screen of the viewport.
     const nearIo = new IntersectionObserver(([entry]) => { if (entry.isIntersecting) { mount(0); nearIo.disconnect() } }, { rootMargin: "100% 0px" })
     nearIo.observe(el)
@@ -103,7 +92,6 @@ export function AboutWho({ label, text, tag }: { label: string; text: string; ta
     io.observe(el)
     return () => {
       cancelAnimationFrame(frame); io.disconnect(); nearIo.disconnect(); measure?.disconnect()
-      slots.forEach(({ cell, hover }, k) => { cell.removeEventListener("pointermove", hover.move); cell.removeEventListener("pointerleave", hover.leave); cell.removeEventListener("pointermove", cursor[k].move); cell.removeEventListener("pointerleave", cursor[k].leave); hover.leave(); cursor[k].leave() })
       scroller.removeEventListener("scroll", schedule); window.removeEventListener("resize", schedule); plain.removeEventListener("change", schedule)
     }
   }, [])
@@ -116,7 +104,7 @@ export function AboutWho({ label, text, tag }: { label: string; text: string; ta
             <div key={key} ref={node => { cells.current[i] = node }} className="about-who-photo" style={{ clipPath: "inset(0 0 100% 0)" }}>
               {src
                 ? <video ref={node => { clips.current[i] = node }} src={src} muted loop playsInline preload="metadata" />
-                : mounted[i] && Ascii && <div className="about-who-ascii"><Ascii onProbe={probeSetters.current[i]} /></div>}
+                : mounted[i] && Ascii && <div className="about-who-ascii"><Ascii /></div>}
             </div>
           ))}
         </div>

@@ -62,12 +62,6 @@ export const defaultGradientSettings = {
   lineWarp: 0.3,            // domain warp of the field
   lineFeather: 160,         // softness of the blend (0–230)
   lineCutoff: 0.45,         // how white the gradient must be for the line to show (higher = only the whitest parts)
-  // ASCII videos (About slots): local black/white point around the cursor while hovering a slot
-  glyphHoverOn: true,
-  glyphHoverBlack: 0,       // signal black point inside the hover circle
-  glyphHoverWhite: 1,       // signal white point inside the hover circle (the slots' own is about 0.13)
-  glyphHoverRadius: 120,    // px, where the circle ends
-  glyphHoverFeather: 80,    // px of soft edge inside the radius
   footerBg: "#0a0a0a",
   footerShapeColor: "#ffffff",
   footerDepth: 0.16,
@@ -153,11 +147,6 @@ export function loadGradientSettings() {
       lineWarp: num(s.lineWarp, d.lineWarp, 0, 1),
       lineFeather: num(s.lineFeather, d.lineFeather, 0, 230),
       lineCutoff: num(s.lineCutoff, d.lineCutoff, 0, 0.9),
-      glyphHoverOn: typeof s.glyphHoverOn === "boolean" ? s.glyphHoverOn : d.glyphHoverOn,
-      glyphHoverBlack: num(s.glyphHoverBlack, d.glyphHoverBlack, 0, 1),
-      glyphHoverWhite: num(s.glyphHoverWhite, d.glyphHoverWhite, 0, 1),
-      glyphHoverRadius: num(s.glyphHoverRadius, d.glyphHoverRadius, 20, 600),
-      glyphHoverFeather: num(s.glyphHoverFeather, d.glyphHoverFeather, 0, 400),
       typeHud: typeof s.typeHud === "boolean" ? s.typeHud : d.typeHud,
       skullScroll: s.skullScroll === 200 ? d.skullScroll : num(s.skullScroll, d.skullScroll, 0, 600), // 200 was the old default: saved presets that never changed it move to the new no-pin default
       skullSpeed: num(s.skullSpeed, d.skullSpeed, -12, 12),
