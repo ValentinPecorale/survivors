@@ -358,3 +358,45 @@ export function hoverMove(id: string, over: HoverKind | null, volume: number, pa
 
 /** Cursor left the scene or hover was switched off. */
 export function hoverStop() { releaseHover() }
+
+// ─── Shared hover-sound settings ───────────────────────────────────────────
+/**
+ * The hover sound is one feature with one set of panel controls (on/off, sound, volume), used by every surface that
+ * plays it: the hero's plants and the About video slots. The Hero publishes the panel's values here; surfaces read them
+ * on each pointer move, so they follow the panel live without sharing React state.
+ */
+const hoverConfig = { enabled: false, volume: 0.5, track: "digital" as string }
+export function setHoverConfig(next: Partial<typeof hoverConfig>) { Object.assign(hoverConfig, next) }
+export const getHoverConfig = () => hoverConfig
+
+/**
+ * Pointer handlers for a flat surface (no 3D picking): the sound plays while the pointer moves over it, follows cursor
+ * speed, and releases ~110ms after the pointer stops or leaves, exactly like the plants. `there`, when given, decides per
+ * point whether there is anything to hear (the video slots pass "is a glyph drawn here"); it is asked at most once per
+ * animation frame, and only while the pointer moves. Returns the two handlers.
+ */
+export function createSurfaceHover(kind: HoverKind = "grove", there?: (clientX: number, clientY: number) => boolean) {
+  let speed = 0, lastX = 0, lastY = 0, lastT = 0, frame = 0
+  let pending: { x: number; y: number } | null = null
+  const run = () => {
+    frame = 0
+    const at = pending; pending = null
+    const cfg = hoverConfig
+    if (!at || !cfg.enabled) return
+    hoverMove(cfg.track, !there || there(at.x, at.y) ? kind : null, cfg.volume, (at.x / window.innerWidth * 2 - 1) * 0.6, speed)
+  }
+  return {
+    move(event: PointerEvent) {
+      const cfg = hoverConfig
+      if (!cfg.enabled || event.pointerType === "touch") return
+      preloadHover(cfg.track)
+      const dt = event.timeStamp - lastT
+      if (lastT && dt > 0 && dt < 200) speed = speed * 0.5 + Math.hypot(event.clientX - lastX, event.clientY - lastY) / dt * 1000 * 0.5
+      else speed = 0
+      lastX = event.clientX; lastY = event.clientY; lastT = event.timeStamp
+      pending = { x: event.clientX, y: event.clientY }
+      if (!frame) frame = requestAnimationFrame(run)
+    },
+    leave() { pending = null; lastT = 0; if (frame) { cancelAnimationFrame(frame); frame = 0 } hoverStop() },
+  }
+}
