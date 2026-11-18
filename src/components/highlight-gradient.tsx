@@ -308,7 +308,7 @@ export function HighlightFrame({ id, words: contentWords, label, text, heading, 
           </filter>
         </svg>
         <p className="visually-hidden">{words.join(", ")}</p>
-        {heading && <div ref={introEl} className="section-feature-intro"><RevealText as="h1" text={heading} trigger="inView" />{intro && <RevealText text={intro} trigger="inView" />}</div>}
+        {heading && <div ref={introEl} className="section-feature-intro"><h1>{heading}</h1>{intro && <p>{intro}</p>}</div>}
         {label && <RevealText className="section-feature-label" text={label} trigger="inView" />}
         <div className="section-feature-main">
         <div className="section-feature-word" aria-hidden="true">

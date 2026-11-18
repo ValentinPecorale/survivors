@@ -1,10 +1,19 @@
 "use client"
 
-import { useEffect, useRef } from "react"
+import dynamic from "next/dynamic"
+import { useEffect, useRef, useState, type ComponentType } from "react"
 import RevealText from "./reveal-text"
 
-/** Placeholder clips (640×640, ~25KB, no audio). Swap the files in /public/videos, or these paths, for the real ones. */
-const VIDEOS = ["/videos/about-1.mp4", "/videos/about-2.mp4", "/videos/about-3.mp4"]
+// Shader Lab (~1MB gz) is only fetched once this frame is within a screen of the viewport.
+const AsciiChrome = dynamic(() => import("./ascii-video").then(m => m.AsciiVideo), { ssr: false })
+const AsciiEagle = dynamic(() => import("./ascii-video-eagle").then(m => m.AsciiVideo), { ssr: false })
+
+/** The three slots. The first two are ASCII compositions (Shader Lab: chrome in ascii-video.tsx, eagle in ascii-video-eagle.tsx); the third is still a plain placeholder clip (640×640, ~25KB, no audio): swap the file in /public/videos for the real one. */
+const SLOTS: { key: string; src?: string; Ascii?: ComponentType }[] = [
+  { key: "chrome", Ascii: AsciiChrome },
+  { key: "eagle", Ascii: AsciiEagle },
+  { key: "clip-3", src: "/videos/about-3.mp4" },
+]
 /** Scroll spent on each video's reveal, in screens (svh). All three = 2.1 screens of pinned scrolling, then the page carries on. */
 const SCROLL_PER_VIDEO = 70
 /** Ease of each video's mask: slow in, slow out, so a video settles fully before the next begins. */
@@ -23,6 +32,7 @@ export function AboutWho({ label, text, tag }: { label: string; text: string; ta
   const track = useRef<HTMLDivElement>(null)
   const cells = useRef<(HTMLDivElement | null)[]>([])
   const clips = useRef<(HTMLVideoElement | null)[]>([])
+  const [near, setNear] = useState(false)
 
   useEffect(() => {
     const el = track.current
@@ -32,7 +42,7 @@ export function AboutWho({ label, text, tag }: { label: string; text: string; ta
     let frame = 0
     const apply = () => {
       frame = 0
-      const n = VIDEOS.length
+      const n = SLOTS.length
       const total = SCROLL_PER_VIDEO * n / 100 * window.innerHeight
       const p = plain.matches ? 1 : clamp01((scroller.scrollTop - el.offsetTop) / total)
       cells.current.forEach((cell, i) => {
@@ -46,24 +56,29 @@ export function AboutWho({ label, text, tag }: { label: string; text: string; ta
     window.addEventListener("resize", schedule)
     plain.addEventListener("change", schedule)
 
+    // Load the ASCII composition once the frame is within a screen of the viewport.
+    const nearIo = new IntersectionObserver(([entry]) => { if (entry.isIntersecting) { setNear(true); nearIo.disconnect() } }, { rootMargin: "100% 0px" })
+    nearIo.observe(el)
     // Only decode video while the frame is on screen.
     const io = new IntersectionObserver(([entry]) => {
       clips.current.forEach(v => { if (!v) return; if (entry.isIntersecting) v.play().catch(() => {}); else v.pause() })
     }, { rootMargin: "50% 0px" })
     io.observe(el)
     return () => {
-      cancelAnimationFrame(frame); io.disconnect()
+      cancelAnimationFrame(frame); io.disconnect(); nearIo.disconnect()
       scroller.removeEventListener("scroll", schedule); window.removeEventListener("resize", schedule); plain.removeEventListener("change", schedule)
     }
   }, [])
 
   return (
-    <div ref={track} className="about-who-track" style={{ height: `calc(100svh + ${SCROLL_PER_VIDEO * VIDEOS.length}svh)` }}>
+    <div ref={track} className="about-who-track" style={{ height: `calc(100svh + ${SCROLL_PER_VIDEO * SLOTS.length}svh)` }}>
       <section className="about-who" aria-label="who we are">
         <div className="about-who-photos" aria-hidden="true">
-          {VIDEOS.map((src, i) => (
-            <div key={src} ref={node => { cells.current[i] = node }} className="about-who-photo" style={{ clipPath: "inset(0 0 100% 0)" }}>
-              <video ref={node => { clips.current[i] = node }} src={src} muted loop playsInline preload="metadata" />
+          {SLOTS.map(({ key, src, Ascii }, i) => (
+            <div key={key} ref={node => { cells.current[i] = node }} className="about-who-photo" style={{ clipPath: "inset(0 0 100% 0)" }}>
+              {src
+                ? <video ref={node => { clips.current[i] = node }} src={src} muted loop playsInline preload="metadata" />
+                : near && Ascii && <div className="about-who-ascii"><Ascii /></div>}
             </div>
           ))}
         </div>

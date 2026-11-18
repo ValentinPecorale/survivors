@@ -67,7 +67,7 @@ export function Hero() {
       </div>
       {/* Figma 21:400 — headline bottom-left, services bottom-right; clicks fall through so cursor orbit still works. */}
       <div className="hero-overlay">
-        <RevealText as="h1" className="hero-title" text="Creating stuff that will survive." />
+        <h1 className="hero-title">Creating stuff that<br />will survive.</h1>
         <ul className="hero-services" aria-label="Services">
           {["Branding", "Websites", "Interior design", "AI Photo studios"].map(name => <RevealText as="li" key={name} text={name} />)}
         </ul>

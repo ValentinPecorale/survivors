@@ -25,7 +25,7 @@ export function SectionContent({ id }: { id: SectionId }) {
   // A section is one tall card: frames stack vertically and the card scrolls through them (see navbar.tsx cardCanScroll).
   return <>
     {!("whatText" in entry) && <section className={`section-intro section-intro--${id}`} aria-label={`${id} introduction`}>
-      <RevealText as="h1" text={entry.heading} trigger="inView" />
+      <h1>{entry.heading}</h1>
       <div className="section-intro-text"><RevealText text={entry.text} trigger="inView" />{/* 2-column grid: text lives in column 1, column 2 stays empty (Figma 15:146) */}</div>
     </section>}
     {"words" in entry && entry.words.length > 0 && <HighlightFrame id={id} words={entry.words} label={"whatLabel" in entry ? entry.whatLabel : undefined} text={"whatText" in entry ? entry.whatText : undefined} heading={"whatText" in entry ? entry.heading : undefined} intro={"whatText" in entry ? entry.text : undefined} />}
