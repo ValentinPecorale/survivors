@@ -24,7 +24,7 @@ const clamp01 = (v: number) => Math.min(1, Math.max(0, v))
 const MOUNT_AHEAD = 0.4
 
 /**
- * About, third frame (Figma 104:718): three videos across the top, then label · paragraph · closing line on the 6 / 3 / 3 grid.
+ * About, third frame (Figma 104:718): three videos across the top, then paragraph · closing line · label on the 6 / 3 / 3 grid (label last, on the right).
  *
  * The frame is pinned (sticky) the moment its bottom edge meets the bottom of the viewport. At that point the video row
  * fills the whole screen. Scroll then drives the videos in one after another, top to bottom: each is a clip-path mask whose
@@ -110,9 +110,9 @@ export function AboutWho({ label, text, tag }: { label: string; text: string; ta
         </div>
         <div ref={textWrap} className="about-who-text-wrap">
           <div ref={textInner} className="about-who-text">
-            <RevealText as="h2" text={label} trigger="inView" />
             <RevealText text={text} trigger="inView" />
             <RevealText text={tag} trigger="inView" />
+            <RevealText as="h2" text={label} trigger="inView" />
           </div>
         </div>
       </section>

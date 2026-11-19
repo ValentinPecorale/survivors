@@ -1,8 +1,8 @@
-import { SectionFooter } from "./section-footer"
 import { HighlightFrame } from "./highlight-gradient"
-import { SkullFrame } from "./skull-frame"
 import RevealText from "./reveal-text"
 import { AboutWho } from "./about-who"
+import { LogoMarquee } from "./logo-marquee"
+import { FeaturedProjects } from "./featured-projects"
 import { SHORTCUT_KEYS } from "./shortcuts"
 import about from "@/content/sections/about.json"
 import services from "@/content/sections/services.json"
@@ -29,8 +29,10 @@ export function SectionContent({ id }: { id: SectionId }) {
       <div className="section-intro-text"><RevealText text={entry.text} trigger="inView" />{/* 2-column grid: text lives in column 1, column 2 stays empty (Figma 15:146) */}</div>
     </section>}
     {"words" in entry && entry.words.length > 0 && <HighlightFrame id={id} words={entry.words} label={"whatLabel" in entry ? entry.whatLabel : undefined} text={"whatText" in entry ? entry.whatText : undefined} heading={"whatText" in entry ? entry.heading : undefined} intro={"whatText" in entry ? entry.text : undefined} />}
+    {"logos" in entry && <LogoMarquee logos={entry.logos} label={"logosLabel" in entry ? entry.logosLabel : undefined} />}
     {"whoText" in entry && <AboutWho label={entry.whoLabel} text={entry.whoText} tag={entry.whoTag} />}
-    {"clients" in entry && entry.clients.length > 0 && <SkullFrame id={id} clients={entry.clients} />}
+    {"projects" in entry && <FeaturedProjects projects={entry.projects} />}
+    {/* Hidden for now: the skull "clients" frame (<SkullFrame id={id} clients={entry.clients} />) and the footer (<SectionFooter />). Components and content are untouched. */}
     {id !== "about" && ["Space for ideas", "A closer look", "More to come"].map((heading, index) => (
       <section className="scroll-placeholder" key={heading} aria-label={`${id} placeholder ${index + 1}`}>
         <div className="scroll-placeholder-meta"><span>{id}</span><span>Placeholder · 0{index + 1} / 03</span></div>
@@ -41,6 +43,5 @@ export function SectionContent({ id }: { id: SectionId }) {
         </div>
       </section>
     ))}
-    <SectionFooter />
   </>
 }

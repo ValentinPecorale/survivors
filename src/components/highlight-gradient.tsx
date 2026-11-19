@@ -30,6 +30,7 @@ uniform float warp;
 uniform float softness;
 uniform float size;
 uniform float intensity;
+uniform float stretch;
 uniform vec3 colors[4];
 float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1,311.7))) * 43758.5453); }
 float noise(vec2 p) {
@@ -41,7 +42,8 @@ vec3 encode(vec3 c) { return mix(c*12.92,1.055*pow(max(c,0.),vec3(1./2.4))-.055,
 void main() {
   // Anchored to the box's left edge at a fixed scale (1 unit = half the box height), not stretched to the box width:
   // when the word grows or shrinks the field stays put and the box only reveals more or less of it.
-  vec2 uv = vec2(gl_FragCoord.x/(resolution.y*.5)-3.5, gl_FragCoord.y/resolution.y*2.-1.);
+  // stretch = 1 (wide boxes like the Featured Projects title): the whole box width maps onto the field, 7.6 units (a normal word box is ~7.6 units wide).
+  vec2 uv = vec2(mix(gl_FragCoord.x/(resolution.y*.5), gl_FragCoord.x/resolution.x*7.6, stretch)-3.5, gl_FragCoord.y/resolution.y*2.-1.);
   vec2 n = uv*(.55+warp*.6+.1*1.6) + 70.3*73.7;
   vec2 flow = vec2(cos(phase),sin(phase))*.16;
   uv += warp*.75*vec2(noise(n+flow),noise(n+vec2(13.7,7.1)+flow));
@@ -74,7 +76,7 @@ const linear = (v: number) => v <= .04045 ? v / 12.92 : ((v + .055) / 1.055) ** 
 const encode = (v: number) => v <= .0031308 ? v * 12.92 : 1.055 * v ** (1 / 2.4) - .055
 
 /** CPU-rendered poster of the same field: shown before WebGL starts, without WebGL, and after context loss. */
-function drawPoster(canvas: HTMLCanvasElement, settings: GradientSettings, aspect: number) {
+function drawPoster(canvas: HTMLCanvasElement, settings: GradientSettings, aspect: number, stretch = false) {
   const ctx = canvas.getContext("2d")
   if (!ctx) return
   if (!(aspect > 0) || !Number.isFinite(aspect)) return // empty text: the box has no width
@@ -92,7 +94,7 @@ function drawPoster(canvas: HTMLCanvasElement, settings: GradientSettings, aspec
     return (a * (1 - fy) + b * fy) * 2 - 1
   }
   for (let y = 0; y < canvas.height; y++) for (let x = 0; x < canvas.width; x++) {
-    let u = (x + .5) / canvas.height * 2 - 3.5, v = 1 - (y + .5) / canvas.height * 2
+    let u = stretch ? (x + .5) / canvas.width * 7.6 - 3.5 : (x + .5) / canvas.height * 2 - 3.5, v = 1 - (y + .5) / canvas.height * 2
     const scale = .71 + settings.warp * .6, nx = u * scale + 70.3 * 73.7, ny = v * scale + 70.3 * 73.7
     u += settings.warp * .75 * noise(nx + .16, ny)
     v += settings.warp * .75 * noise(nx + 13.7 + .16, ny + 7.1)
@@ -115,7 +117,7 @@ function drawPoster(canvas: HTMLCanvasElement, settings: GradientSettings, aspec
 }
 
 /** `idle.current` true = the gradient is invisible right now (between words), so skip drawing it. */
-function MeshGradient({ settings, surface, box, idle }: { settings: GradientSettings; surface: RefObject<HTMLElement | null>; box: RefObject<HTMLElement | null>; idle: { current: boolean } }) {
+export function MeshGradient({ settings, surface, box, idle, stretch = false }: { settings: GradientSettings; surface: RefObject<HTMLElement | null>; box: RefObject<HTMLElement | null>; idle: { current: boolean }; stretch?: boolean }) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const posterRef = useRef<HTMLCanvasElement>(null)
   const live = useRef(settings)
@@ -130,12 +132,12 @@ function MeshGradient({ settings, surface, box, idle }: { settings: GradientSett
       cancelAnimationFrame(repaint)
       repaint = requestAnimationFrame(() => {
         if (canvasRef.current?.style.opacity === "1") return // WebGL is drawing over it: nothing to show, nothing to spend
-        drawPoster(poster, live.current, element.clientWidth / Math.max(1, element.clientHeight))
+        drawPoster(poster, live.current, element.clientWidth / Math.max(1, element.clientHeight), stretch)
       })
     }
     const observer = new ResizeObserver(paint); observer.observe(element); paint()
     return () => { observer.disconnect(); cancelAnimationFrame(repaint) }
-  }, [box, settings])
+  }, [box, settings, stretch])
 
   useEffect(() => {
     const canvas = canvasRef.current, element = box.current, stage = surface.current
@@ -157,7 +159,7 @@ function MeshGradient({ settings, surface, box, idle }: { settings: GradientSett
     const buffer = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, buffer)
     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW)
     const location = gl.getAttribLocation(program, "position"); gl.enableVertexAttribArray(location); gl.vertexAttribPointer(location, 2, gl.FLOAT, false, 0, 0)
-    const uniforms = Object.fromEntries(["resolution", "cursor", "phase", "warp", "softness", "size", "intensity", "colors[0]"].map(name => [name, gl.getUniformLocation(program, name)]))
+    const uniforms = Object.fromEntries(["resolution", "cursor", "phase", "warp", "softness", "size", "intensity", "stretch", "colors[0]"].map(name => [name, gl.getUniformLocation(program, name)]))
     const reduced = matchMedia("(prefers-reduced-motion: reduce)")
     let frame = 0, previous = 0, phase = 0, lost = false, visible = false
     let current = { x: -.537, y: .296 }; const target = { ...current }
@@ -167,7 +169,7 @@ function MeshGradient({ settings, surface, box, idle }: { settings: GradientSett
       gl.uniform2f(uniforms.resolution, canvas.width, canvas.height)
       gl.uniform2f(uniforms.cursor, current.x, current.y); gl.uniform1f(uniforms.phase, phase)
       gl.uniform1f(uniforms.warp, s.warp); gl.uniform1f(uniforms.softness, s.softness)
-      gl.uniform1f(uniforms.size, s.size / 100); gl.uniform1f(uniforms.intensity, s.intensity / 100)
+      gl.uniform1f(uniforms.size, s.size / 100); gl.uniform1f(uniforms.intensity, s.intensity / 100); gl.uniform1f(uniforms.stretch, stretch ? 1 : 0)
       gl.uniform3fv(uniforms["colors[0]"], new Float32Array([s.highlight, s.shadow, s.slate, s.base].flatMap(rgb)))
       gl.drawArrays(gl.TRIANGLES, 0, 3); canvas.style.opacity = "1"
     }
@@ -205,7 +207,7 @@ function MeshGradient({ settings, surface, box, idle }: { settings: GradientSett
     const stop = () => { cancelAnimationFrame(frame); frame = 0 }
     const contextLost = (event: Event) => {
       event.preventDefault(); lost = true; canvas.style.opacity = "0"; stop()
-      if (posterRef.current) drawPoster(posterRef.current, live.current, element.clientWidth / Math.max(1, element.clientHeight))
+      if (posterRef.current) drawPoster(posterRef.current, live.current, element.clientWidth / Math.max(1, element.clientHeight), stretch)
     }
     const visibility = () => { stop(); start() }
     const intersection = new IntersectionObserver(([entry]) => { visible = entry.isIntersecting; if (visible) start(); else stop() })
@@ -220,7 +222,7 @@ function MeshGradient({ settings, surface, box, idle }: { settings: GradientSett
       canvas.removeEventListener("webglcontextlost", contextLost); document.removeEventListener("visibilitychange", visibility)
       gl.deleteBuffer(buffer); gl.deleteProgram(program); shaders.forEach(shader => gl.deleteShader(shader))
     }
-  }, [surface, box, idle])
+  }, [surface, box, idle, stretch])
 
   return <><canvas ref={posterRef} className="mesh-poster" /><canvas ref={canvasRef} className="mesh-canvas" /></>
 }

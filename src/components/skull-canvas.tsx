@@ -36,7 +36,9 @@ export type SkullBridge = { angle: number; direction: 1 | -1; velocity: number; 
 type Props = { settings: GradientSettings; bridge: { current: SkullBridge }; onReady: () => void }
 
 function Skull({ settings, bridge, onReady }: Props) {
-  const { scene } = useGLTF(SKULL_URL)
+  const { scene: shared } = useGLTF(SKULL_URL)
+  // useGLTF caches one scene; an Object3D can belong to only one canvas, so every skull on screen gets its own clone (geometry is still shared).
+  const scene = useMemo(() => shared.clone(true), [shared])
   const texture = useLoader(HDRLoader, STUDIO_URL)
   const invalidate = useThree(s => s.invalidate)
   const group = useRef<THREE.Group>(null)
@@ -96,7 +98,7 @@ function KeyLight() {
 export function SkullCanvas(props: Props) {
   return (
     <Canvas flat frameloop="demand" dpr={[1, 1.5]} camera={{ fov: CAMERA_FOV, position: [0, 0, CAMERA_DISTANCE], near: 0.1, far: 80 }}
-      gl={{ alpha: true, antialias: true, powerPreference: "low-power" }}
+      gl={{ alpha: true, antialias: true, powerPreference: "low-power", preserveDrawingBuffer: true }}
       // R3F's container takes pointer events by default; this canvas must let them through to the names beneath it.
       style={{ width: "100%", height: "100%", pointerEvents: "none" }}>
       <KeyLight />

@@ -22,6 +22,26 @@ export default config({
         description: 'Typed one at a time in the pinned second frame: scrolling deletes the current word letter by letter, then types the next. The gradient hugs the text. The last word, fully typed, ends the section.',
         itemLabel: props => props.value,
       }),
+      projects: fields.array(fields.object({
+        title: fields.text({ label: 'Name', validation: { isRequired: true } }),
+        tag: fields.text({ label: 'Category', description: 'e.g. Branding.' }),
+        image: fields.text({ label: 'Image', description: 'Path under /public, e.g. /images/featured/posada.webp.' }),
+        href: fields.text({ label: 'Link', description: 'https://… (opens in a new tab) or /page. Empty = shown but not clickable.' }),
+      }), {
+        label: 'Featured projects',
+        description: 'The project cards under the FEATURED PROJECTS title, in this order. Two show at a time: scrolling brings the next pair in from the bottom. Leave Image empty for a placeholder block.',
+        itemLabel: props => props.fields.title.value,
+      }),
+      logosLabel: fields.text({ label: 'Logo strip · label', description: 'The line under the logo strip.' }),
+      logos: fields.array(fields.object({
+        id: fields.select({ label: 'Logo', options: [{ label: 'Oberá', value: 'obera' }, { label: 'TPG Mayorista', value: 'tpg' }, { label: 'La Posada Del Tano', value: 'posada' }, { label: 'Becerro Inmobiliaria', value: 'becerro' }, { label: 'Quiero misREDES', value: 'quiero' }], defaultValue: 'obera' }),
+        name: fields.text({ label: 'Name', description: 'Read out by screen readers.', validation: { isRequired: true } }),
+        href: fields.text({ label: 'Link', description: 'https://… (opens in a new tab) or /page (stays in the site). Leave empty until the link is ready: the logo is then shown but not clickable.' }),
+      }), {
+        label: 'Logo strip',
+        description: 'The infinite horizontal logo scroller under the second frame, in this order.',
+        itemLabel: props => props.fields.name.value,
+      }),
       whoLabel: fields.text({ label: 'Third frame · label', validation: { isRequired: true } }),
       whoText: fields.text({ label: 'Third frame · text', multiline: true, validation: { isRequired: true } }),
       whoTag: fields.text({ label: 'Third frame · closing line', validation: { isRequired: true } }),

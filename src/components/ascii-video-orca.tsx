@@ -83,6 +83,7 @@ const config: ShaderLabConfig = {
 /** The clip(s) this composition plays. One clip here, so there is nothing to keep in sync. */
 const SOURCES = ["/videos/orcanegro.webm"] as const
 
+
 export function AsciiVideo({ className, allowMobile }: { className?: string; allowMobile?: boolean }) {
   return <AsciiVideoRuntime config={config} sources={SOURCES} className={className} allowMobile={allowMobile} />
 }

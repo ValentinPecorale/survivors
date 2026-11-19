@@ -315,10 +315,10 @@ body {
 /* The wrapper grows from 0 to the text's natural height (scroll-driven), pushing the video row up; the inner block keeps its 20px gap above it. */
 .about-who-text-wrap { grid-column: 1 / -1; overflow: hidden; height: 0; }
 .about-who-text { padding-top: 20px; display: grid; grid-template-columns: repeat(var(--page-columns), minmax(0, 1fr)); column-gap: var(--page-gutter); align-items: end; font: 600 26px/normal var(--font-geist-sans), sans-serif; letter-spacing: 0; }
-.about-who-text h2 { grid-column: 1 / span 6; margin: 0; color: #fff; font: inherit; }
+.about-who-text h2 { grid-column: 10 / span 3; margin: 0; color: #fff; font: inherit; }
 .about-who-text p { margin: 0; color: #8e8e8e; }
-.about-who-text p:nth-of-type(1) { grid-column: 7 / span 3; }
-.about-who-text p:nth-of-type(2) { grid-column: 10 / span 3; }
+.about-who-text p:nth-of-type(1) { grid-column: 1 / span 6; }
+.about-who-text p:nth-of-type(2) { grid-column: 7 / span 3; }
 @media (max-width: 700px) {
   .section-feature-intro h1 { font-size: clamp(30px, 8vw, 55px); line-height: 1.1; }
   .section-feature-intro p { margin-top: 16px; font-size: clamp(20px, 6vw, 47px); line-height: 1; }
@@ -327,6 +327,7 @@ body {
   .section-feature-label, .section-feature-text, .about-who-text { font-size: clamp(16px, 4.4vw, 26px); }
   .about-who-text h2, .about-who-text p:nth-of-type(1), .about-who-text p:nth-of-type(2) { grid-column: 1 / -1; }
   .about-who-text { padding-top: 16px; }
+  .about-who-text h2 { order: -1; } /* phones stack: the label leads */
 }
 /* Phones and reduced motion: no pin and no mask, the three videos are simply there. */
 @media (max-width: 700px), (prefers-reduced-motion: reduce) {
@@ -342,3 +343,72 @@ body {
 .section-line--abs { position: absolute; left: 0; right: 0; z-index: 2; }
 .section-line--plain { background: #fff; }
 .section-line--plain canvas { display: none; }
+/* Logo strip (Figma 145:1481): infinite marquee. Four copies of the set, slid left by exactly one copy. Speed: 60px/s at desktop size
+   (one set is ~1248px: 763px of logos + 5 × 97px gaps), scaled with --logo-scale so phones keep the same pace. */
+.logo-marquee { --logo-scale: 1; --logo-gap: 97px; position: relative; overflow: hidden; padding: calc(120px * var(--logo-scale)) 0 0; background: #0a0a0a; }
+/* The clip frame (Figma "clip content"): inset by the 32px page gutter plus half a skull (61px) each side, so the skulls sit 32px from the viewport edges, centred on its two edges. */
+.logo-marquee-clip { overflow: hidden; margin: 0 calc(32px + 61px * var(--logo-scale)); padding-bottom: calc(120px * var(--logo-scale)); }
+.logo-marquee-track { display: flex; width: max-content; animation: logo-marquee calc(20.8s * var(--logo-scale)) linear infinite; will-change: transform; }
+.logo-marquee-set { display: flex; flex: none; align-items: center; margin: 0; padding: 0; list-style: none; }
+.logo-marquee-set li { flex: none; margin-right: calc(var(--logo-gap) * var(--logo-scale)); }
+.logo-link { display: block; cursor: alias; filter: brightness(1) invert(0); transition: filter 150ms ease; }
+.logo-link:hover, a.logo-link:focus-visible { filter: brightness(0) invert(1); } /* #8E8E8E → pure white */
+a.logo-link:focus-visible { outline: 1px solid #8e8e8e; outline-offset: 8px; }
+.logo-mark { position: relative; display: block; width: calc(var(--w) * var(--logo-scale) * 1px); height: calc(var(--h) * var(--logo-scale) * 1px); }
+.logo-mark img { position: absolute; display: block; max-width: none; user-select: none; }
+/* Skulls (Figma 145:1481): 122×142 on each end, left one at y 74, right one at y 70 (measured from the strip's top, which is 120px of padding above the logos). */
+.logo-skull { position: absolute; z-index: 1; width: calc(122px * var(--logo-scale)); height: calc(142px * var(--logo-scale)); pointer-events: none; }
+.logo-skull-left { left: 32px; top: calc(74px * var(--logo-scale)); }
+.logo-skull-right { right: 32px; top: calc(70px * var(--logo-scale)); }
+.logo-skull img { object-fit: contain; transition: opacity 0.4s ease; }
+.logo-skull canvas { opacity: 0; transition: opacity 0.4s ease; }
+.logo-skull[data-ready="true"] canvas { opacity: 1; }
+.logo-skull[data-ready="true"] img { opacity: 0; } /* the poster only stands in until the live canvas is drawing */
+/* "Trusted by": Geist SemiBold 26px / normal, white, starting on the centre line, 8px under the strip. */
+.logo-marquee-title { position: relative; margin: 8px 0 0 50%; font-family: var(--font-geist-sans, "Geist", sans-serif); font-size: 26px; font-weight: 600; line-height: normal; color: #fff; }
+@keyframes logo-marquee { to { transform: translateX(-25%); } }
+@media (max-width: 700px) { .logo-marquee { --logo-scale: 0.7; } }
+@media (prefers-reduced-motion: reduce) { .logo-marquee { overflow-x: auto; } .logo-marquee-track { animation: none; } }
+/* Featured projects (Figma 163:2614): one screen. The title is a 13.6:1 mask (the Figma letters merged) over the interactive gradient, so it spans the width at any size. */
+.featured-track { position: relative; }
+.featured { position: sticky; top: 0; height: 100vh; height: 100svh; display: flex; flex-direction: column; gap: 32px; padding: 96px var(--page-margin) var(--page-margin); background: #0a0a0a; font-family: var(--font-geist-sans), sans-serif; }
+.featured-title { position: relative; flex: none; width: 100%; aspect-ratio: 2748 / 202; -webkit-mask: url(/images/featured/featured-projects-mask.png) center / 100% 100% no-repeat; mask: url(/images/featured/featured-projects-mask.png) center / 100% 100% no-repeat; }
+.featured-title canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+/* Two fixed slots under the title. Each holds a stack of cards; later cards sit over earlier ones (z-index = project number) and rise into place from below. */
+.featured-cards { flex: 1; min-height: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-rows: minmax(0, 1fr); column-gap: var(--page-gutter); margin: 0; padding: 0; list-style: none; }
+.featured-slot { position: relative; min-height: 0; overflow: hidden; }
+.featured-layer { position: absolute; inset: 0; will-change: transform; }
+.featured-layer:first-child { position: relative; height: 100%; will-change: auto; }
+.featured-card-placeholder { position: absolute; inset: 0; background: #161616; }
+/* Card states (Figma 164:2670, used the other way round from how the variants are named). Regular: black-and-white photo under a dot grid, name not underlined. Hover: the photo is in full colour, the dots go, the name is underlined. All instant. */
+.featured-card { position: relative; height: 100%; display: flex; flex-direction: column; background: #0a0a0a; cursor: pointer; }
+/* Hover dot grid over the whole card, bars included. Measured from the frame: #8E8E8E dots, ~5.83px pitch, ~70% at the centre, normal blend (lightens the black bars, darkens the paper). Instant, like the underline. */
+.featured-card::after { content: ""; position: absolute; inset: 0; z-index: 1; pointer-events: none; opacity: 0.7; background: radial-gradient(circle at 50% 50%, #8e8e8e 0.55px, transparent 0.9px) 0 0 / 5.83px 5.83px; }
+.featured-card:hover::after, .featured-card:focus-visible::after { opacity: 0; }
+.featured-card-title { position: relative; align-self: flex-start; margin: 8px; padding-left: 1.5em; /* 22.5px marker gutter */ font: 400 15px/normal var(--font-space-grotesk), sans-serif; letter-spacing: 0.3em; text-transform: uppercase; color: #fff; }
+.featured-card-num { position: absolute; left: 0; width: 1.5em; text-align: right; }
+.featured-card-title::after { content: ""; position: absolute; left: 1.5em; right: 0.3em; bottom: 2px; height: 1px; background: #fff; opacity: 0; } /* the hover underline (under the name, not the number) */
+.featured-card:hover .featured-card-title::after, .featured-card:focus-visible .featured-card-title::after { opacity: 1; }
+.featured-card:focus-visible { outline: 1px solid #8e8e8e; outline-offset: 4px; }
+.featured-card-image { position: relative; flex: 1; min-height: 0; display: block; }
+.featured-card-image img { object-fit: cover; }
+/* Regular photo: Figma's black-and-white version, matched by tone (measured: luma × 0.986 − 20, which is grayscale + contrast 1.187 + brightness 0.83). One filter for every project, no second image to load. */
+.featured-card-image img { filter: grayscale(1) contrast(1.187) brightness(0.83); }
+.featured-card:hover .featured-card-image img, .featured-card:focus-visible .featured-card-image img { filter: none; }
+.featured-card-tag { padding: 6px 8px; font: 600 26px/normal var(--font-geist-sans), sans-serif; color: #8e8e8e; }
+@media (max-width: 700px), (prefers-reduced-motion: reduce) { /* no pin, no overlap: every card, in project order */
+  .featured-track { height: auto !important; }
+  .featured { position: relative; height: auto; min-height: 100svh; }
+  .featured-cards { grid-template-rows: none; row-gap: 32px; }
+  .featured-slot { display: contents; }
+  .featured-layer, .featured-layer:first-child { position: relative; inset: auto; height: auto; transform: none !important; will-change: auto; }
+  .featured-card { height: 100%; }
+}
+@media (max-width: 700px) {
+  .featured-cards { grid-template-columns: 1fr; }
+  .featured-card { height: auto; }
+  .featured-card-placeholder { position: relative; display: block; aspect-ratio: 714 / 546; }
+  .featured-card-image { flex: none; aspect-ratio: 714 / 546; }
+  .featured-card-title { font-size: 13px; } .featured-card-tag { font-size: clamp(16px, 4.4vw, 26px); }
+}
+

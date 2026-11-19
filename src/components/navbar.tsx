@@ -9,10 +9,14 @@ import { getCardSettings, loadCardSettings, useCardSettings } from "./card-setti
 import { loadGradientSettings } from "./gradient-settings"
 import { SoundToggle } from "./sound-toggle"
 import { SectionLine } from "./section-line"
-import { SHORTCUT_KEYS } from "./shortcuts"
+import { SHORTCUT_KEYS, SOUND_KEY } from "./shortcuts"
+import { toggleAudio } from "./hero/sound"
 
 /** Scroll distance for one full slide, as a fraction of viewport height. 1:1 and linear. */
 const SCROLL_TRAVEL = 0.8
+/** Keyboard scrolling: one arrow press moves this many px (holding repeats); PageUp / PageDown move this share of the screen. */
+const KEY_STEP = 100
+const KEY_PAGE = 0.85
 
 /**
  * Centered nav over the hero. Each link owns one full-screen card (three max)
@@ -109,6 +113,7 @@ export function Navbar({ children }: { children: ReactNode }) {
     const editable = (target: EventTarget | null) => target instanceof HTMLElement && (target.isContentEditable || /^(TEXTAREA|SELECT)$/.test(target.tagName) || (target instanceof HTMLInputElement && !/^(range|checkbox|radio|color|button)$/.test(target.type)))
     const down = (event: KeyboardEvent) => {
       if (event.repeat || event.ctrlKey || event.metaKey || event.altKey || editable(event.target)) return
+      if (event.key.toLowerCase() === SOUND_KEY) { toggleAudio(); return }
       if (event.key.toLowerCase() === SHORTCUT_KEYS[0]) { engine.closeAll(); return }
       const section = sections.find(s => s.key === event.key.toLowerCase())
       if (section) engine.open(section.id)
@@ -176,6 +181,18 @@ export function Navbar({ children }: { children: ReactNode }) {
       if (!pixels || (engine.frontReached() && !engine.frontSettled()) || scrollContent(pixels)) return
       engine.scrub(pixels / travel())
     }
+    // Keyboard: Arrow Up / Down and Page Up / Down scroll exactly like the mouse wheel (same routing, same smoothing and speed),
+    // so they scroll the open card, or drive the hero → card transition when no card is open. Controls that use the arrows themselves
+    // (sliders, selects, text fields) keep them; Space stays the Contact shortcut.
+    const typing = (target: EventTarget | null) => target instanceof Element && !!target.closest("input, select, textarea, [contenteditable=''], [contenteditable='true'], [role='slider']")
+    const onKey = (event: KeyboardEvent) => {
+      if (event.defaultPrevented || event.ctrlKey || event.metaKey || event.altKey || event.shiftKey || typing(event.target)) return
+      const pixels = event.key === "ArrowDown" ? KEY_STEP : event.key === "ArrowUp" ? -KEY_STEP : event.key === "PageDown" ? window.innerHeight * KEY_PAGE : event.key === "PageUp" ? -window.innerHeight * KEY_PAGE : 0
+      if (!pixels) return
+      event.preventDefault()
+      if ((engine.frontReached() && !engine.frontSettled()) || scrollContent(pixels)) return
+      engine.scrub(pixels / travel())
+    }
     const onTouchStart = (event: TouchEvent) => { touch.y = ignored(event.target) ? null : event.touches[0].clientY }
     const onTouchMove = (event: TouchEvent) => {
       if (touch.y === null) return
@@ -189,10 +206,12 @@ export function Navbar({ children }: { children: ReactNode }) {
       engine.scrub(delta / travel())
     }
     window.addEventListener("wheel", onWheel, { passive: false })
+    window.addEventListener("keydown", onKey)
     window.addEventListener("touchstart", onTouchStart, { passive: true })
     window.addEventListener("touchmove", onTouchMove, { passive: false })
     return () => {
       window.removeEventListener("wheel", onWheel)
+      window.removeEventListener("keydown", onKey)
       window.removeEventListener("touchstart", onTouchStart)
       window.removeEventListener("touchmove", onTouchMove)
     }
@@ -221,9 +240,8 @@ export function Navbar({ children }: { children: ReactNode }) {
       </header>
       {/* Keep the route outlet rendered even when Home has no card. The page
           can return null, but Next still needs to visit its segment boundary. */}
-      {!cards.some(card => sectionFromPath(pathname) === card.id) && (
-        <div hidden={sectionFromPath(pathname) !== undefined}>{children}</div>
-      )}
+      {/* The section pages render null (their content lives in the cards below), so this costs nothing. */}
+      <div hidden>{children}</div>
       {cards.map((card, index) => {
         const section = sections.find(s => s.id === card.id) ?? sections[0]
         return (
@@ -237,7 +255,7 @@ export function Navbar({ children }: { children: ReactNode }) {
             style={{ zIndex: 15 + index, transform: "none" }}
           >
             <div className="site-card-inner">
-              {sectionFromPath(pathname) === card.id ? children : <SectionContent id={card.id} />}
+              <SectionContent id={card.id} />
 
             </div>
           </aside>
