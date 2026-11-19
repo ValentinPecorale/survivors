@@ -335,6 +335,15 @@ export function PropertiesPanel({ ascii, model, onAscii, onModel, status }: Prop
             <Range label="Mesh warp" value={gradient.lineWarp} min={0} max={1} onChange={v => gr("lineWarp", v)} />
             <Range label="Blend softness" value={gradient.lineFeather} min={0} max={230} step={10} onChange={v => gr("lineFeather", v)} />
           </Group>
+          <Group title="Featured cards · ASCII dots">
+            <Toggle label="Dots" value={gradient.dotsEnabled} onChange={v => gr("dotsEnabled", v)} />
+            <Color label="Color" value={gradient.dotsColor} onChange={v => gr("dotsColor", v)} />
+            <Range label="Opacity" value={gradient.dotsOpacity} min={0} max={1} step={0.01} onChange={v => gr("dotsOpacity", v)} />
+            <Range label="Columns · across a card" value={gradient.dotsColumns} min={20} max={400} step={1} onChange={v => gr("dotsColumns", v)} />
+            <Range label="Row height · × cell width" value={gradient.dotsRatio} min={0.5} max={4} step={0.01} onChange={v => gr("dotsRatio", v)} />
+            <Range label="Dot size · px" value={gradient.dotsSize} min={0.5} max={6} step={0.1} onChange={v => gr("dotsSize", v)} />
+            <p className="property-help">The &quot;.&quot; grid over the black-and-white cards, the same field the ASCII effect draws over the videos. Cells are sized from the card width, so the columns stay the same at any screen size. Hover removes it. About → Featured projects.</p>
+          </Group>
           <Group title="Client list">
             <Range label="Text size · px" value={gradient.listSize} min={20} max={120} step={1} onChange={v => gr("listSize", v)} />
             <Color label="Regular color" value={gradient.listColor} onChange={v => gr("listColor", v)} />

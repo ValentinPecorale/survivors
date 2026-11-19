@@ -24,7 +24,9 @@ export default config({
       }),
       projects: fields.array(fields.object({
         title: fields.text({ label: 'Name', validation: { isRequired: true } }),
-        tag: fields.text({ label: 'Category', description: 'e.g. Branding.' }),
+        tag: fields.text({ label: 'Services', description: 'e.g. Branding, Website, AI Development.' }),
+        description: fields.text({ label: 'Description', multiline: true }),
+        date: fields.text({ label: 'Date', description: 'e.g. 03/2026.' }),
         image: fields.text({ label: 'Image', description: 'Path under /public, e.g. /images/featured/posada.webp.' }),
         href: fields.text({ label: 'Link', description: 'https://… (opens in a new tab) or /page. Empty = shown but not clickable.' }),
       }), {

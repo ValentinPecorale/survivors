@@ -310,7 +310,9 @@ body {
 .about-who-photos { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); column-gap: var(--page-gutter); min-height: 0; }
 .about-who-photo { position: relative; min-height: 0; overflow: hidden; container-type: size; background: #0a0a0a; }
 /* The 16:9 composition covers its cell (cropped, never stretched): as wide as the cell, or as tall as it, whichever needs more. */
-.about-who-ascii { position: absolute; left: 50%; top: 50%; width: max(100cqw, 100cqh * 16 / 9); transform: translate(-50%, -50%); mix-blend-mode: lighten; }
+/* The ASCII composition is sized once, for the slot at its tallest (the whole screen under the nav: 100svh − 96px − the 32px margin), and never rescaled. As the text grows and the slots get shorter they only crop it from the bottom, like a curtain: the columns, the glyph size and the dots stay exactly as they were. Scaling it with the slot height is what used to shrink the glyphs. */
+.about-who-photo { --full-h: calc(100vh - 96px - var(--page-margin)); --full-h: calc(100svh - 96px - var(--page-margin)); }
+.about-who-ascii { position: absolute; left: 50%; top: 0; width: max(100cqw, var(--full-h) * 16 / 9); transform: translateX(-50%); mix-blend-mode: lighten; }
 .about-who-photo video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
 /* The wrapper grows from 0 to the text's natural height (scroll-driven), pushing the video row up; the inner block keeps its 20px gap above it. */
 .about-who-text-wrap { grid-column: 1 / -1; overflow: hidden; height: 0; }
@@ -336,6 +338,7 @@ body {
   .about-who-text-wrap { height: auto !important; overflow: visible; }
   .about-who-photos { min-height: 40svh; }
   .about-who-photo { clip-path: none !important; }
+  .about-who-ascii { top: 50%; width: max(100cqw, 100cqh * 16 / 9); transform: translate(-50%, -50%); } /* no pin, no shrinking: plain cover */
 }
 /* Section lines: 1px, full width. The canvas is the shared gradient strip: white where the line's own gradient is white, empty elsewhere. */
 .section-line { display: block; width: 100%; height: 1px; pointer-events: none; }
@@ -382,20 +385,26 @@ a.logo-link:focus-visible { outline: 1px solid #8e8e8e; outline-offset: 8px; }
 .featured-card-placeholder { position: absolute; inset: 0; background: #161616; }
 /* Card states (Figma 164:2670, used the other way round from how the variants are named). Regular: black-and-white photo under a dot grid, name not underlined. Hover: the photo is in full colour, the dots go, the name is underlined. All instant. */
 .featured-card { position: relative; height: 100%; display: flex; flex-direction: column; background: #0a0a0a; cursor: pointer; }
-/* Hover dot grid over the whole card, bars included. Measured from the frame: #8E8E8E dots, ~5.83px pitch, ~70% at the centre, normal blend (lightens the black bars, darkens the paper). Instant, like the underline. */
-.featured-card::after { content: ""; position: absolute; inset: 0; z-index: 1; pointer-events: none; opacity: 0.7; background: radial-gradient(circle at 50% 50%, #8e8e8e 0.55px, transparent 0.9px) 0 0 / 5.83px 5.83px; }
-.featured-card:hover::after, .featured-card:focus-visible::after { opacity: 0; }
+/* Dot grid confined to the image frame; panel settings supply the device-pixel tile. Hidden on card hover or keyboard focus. */
+.featured-card-image::after { content: ""; position: absolute; inset: 0; z-index: 1; pointer-events: none; background: var(--dots, linear-gradient(transparent, transparent)) 0 0 / var(--dot-w, 5.918px) var(--dot-h, 12.25px); }
+.featured-card:hover .featured-card-image::after, .featured-card:focus-visible .featured-card-image::after { opacity: 0; }
 .featured-card-title { position: relative; align-self: flex-start; margin: 8px; padding-left: 1.5em; /* 22.5px marker gutter */ font: 400 15px/normal var(--font-space-grotesk), sans-serif; letter-spacing: 0.3em; text-transform: uppercase; color: #fff; }
 .featured-card-num { position: absolute; left: 0; width: 1.5em; text-align: right; }
 .featured-card-title::after { content: ""; position: absolute; left: 1.5em; right: 0.3em; bottom: 2px; height: 1px; background: #fff; opacity: 0; } /* the hover underline (under the name, not the number) */
 .featured-card:hover .featured-card-title::after, .featured-card:focus-visible .featured-card-title::after { opacity: 1; }
 .featured-card:focus-visible { outline: 1px solid #8e8e8e; outline-offset: 4px; }
 .featured-card-image { position: relative; flex: 1; min-height: 0; display: block; }
-.featured-card-image img { object-fit: cover; }
 /* Regular photo: Figma's black-and-white version, matched by tone (measured: luma × 0.986 − 20, which is grayscale + contrast 1.187 + brightness 0.83). One filter for every project, no second image to load. */
-.featured-card-image img { filter: grayscale(1) contrast(1.187) brightness(0.83); }
-.featured-card:hover .featured-card-image img, .featured-card:focus-visible .featured-card-image img { filter: none; }
-.featured-card-tag { padding: 6px 8px; font: 600 26px/normal var(--font-geist-sans), sans-serif; color: #8e8e8e; }
+.featured-card-image [role="img"] { filter: grayscale(1) contrast(1.187) brightness(0.83); } /* the RevealImage wrapper (its canvases), glyphs included */
+.featured-card:hover .featured-card-image [role="img"], .featured-card:focus-visible .featured-card-image [role="img"] { filter: none; }
+.featured-card-meta { display: flex; align-items: stretch; gap: 8px; flex: none; padding: 6px 0; font: 400 15px/normal var(--font-geist-sans), sans-serif; color: #8e8e8e; }
+.featured-card:hover .featured-card-meta, .featured-card:focus-visible .featured-card-meta { color: #fff; }
+.featured-card-description, .featured-card-details { flex: 1; min-width: 0; }
+.featured-card-description { display: flex; align-items: center; }
+.featured-card-details { display: flex; align-items: stretch; gap: 8px; }
+.featured-card-details > span:not(.featured-meta-rule) { flex: 1; min-width: 0; }
+.featured-card-meta .rt { overflow-wrap: anywhere; }
+.featured-meta-rule { flex: 0 0 var(--dot-w, 6px); align-self: stretch; background: var(--metadata-dots, none) center top / var(--dot-w, 6px) var(--dot-h, 12px) repeat-y; }
 @media (max-width: 700px), (prefers-reduced-motion: reduce) { /* no pin, no overlap: every card, in project order */
   .featured-track { height: auto !important; }
   .featured { position: relative; height: auto; min-height: 100svh; }
@@ -409,6 +418,6 @@ a.logo-link:focus-visible { outline: 1px solid #8e8e8e; outline-offset: 8px; }
   .featured-card { height: auto; }
   .featured-card-placeholder { position: relative; display: block; aspect-ratio: 714 / 546; }
   .featured-card-image { flex: none; aspect-ratio: 714 / 546; }
-  .featured-card-title { font-size: 13px; } .featured-card-tag { font-size: clamp(16px, 4.4vw, 26px); }
+  .featured-card-title { font-size: 13px; }
 }
 

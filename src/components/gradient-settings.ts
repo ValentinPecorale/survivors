@@ -86,6 +86,13 @@ export const defaultGradientSettings = {
   footerFinish: "metal" as "metal" | "matte" | "satin" | "glossy",
   footerProjection: "orthographic" as "orthographic" | "perspective",
   footerKeyColor: "#ffffff", footerFillColor: "#ffffff",
+  // Featured projects: the ASCII dot grid over the regular cards (the effect's "." field, rebuilt as a tile; see featured-projects.tsx)
+  dotsEnabled: false,  // hidden for now: switch on in the panel (About → Featured cards · ASCII dots)
+  dotsColor: "#ffffff",
+  dotsOpacity: 0.45,   // ink per dot (0–1)
+  dotsColumns: 115,    // columns across one card (the video slots use 155 across ~917px: 5.9px cells; a 678px card at 115 columns is the same cell)
+  dotsRatio: 2.07,     // cell height ÷ cell width: the glyph aspect of the effect (12.25 ÷ 5.918)
+  dotsSize: 1.5,       // px: the dot
   // Inner shadow on the word (SVG filter: inverted alpha, offset, blurred, clipped to the glyphs)
   shadowEnabled: true,
   shadowColor: "#000000",
@@ -189,6 +196,12 @@ export function loadGradientSettings() {
       footerFinish: s.footerFinish === "matte" || s.footerFinish === "satin" || s.footerFinish === "glossy" ? s.footerFinish : "metal",
       footerProjection: s.footerProjection === "perspective" ? "perspective" : "orthographic",
       footerKeyColor: hex(s.footerKeyColor, d.footerKeyColor), footerFillColor: hex(s.footerFillColor, d.footerFillColor),
+      dotsEnabled: typeof s.dotsEnabled === "boolean" ? s.dotsEnabled : d.dotsEnabled,
+      dotsColor: hex(s.dotsColor, d.dotsColor),
+      dotsOpacity: num(s.dotsOpacity, d.dotsOpacity, 0, 1),
+      dotsColumns: Math.round(num(s.dotsColumns, d.dotsColumns, 20, 400)),
+      dotsRatio: num(s.dotsRatio, d.dotsRatio, 0.5, 4),
+      dotsSize: num(s.dotsSize, d.dotsSize, 0.5, 6),
       shadowEnabled: typeof s.shadowEnabled === "boolean" ? s.shadowEnabled : d.shadowEnabled,
       shadowColor: hex(s.shadowColor, d.shadowColor),
       shadowOpacity: num(s.shadowOpacity, d.shadowOpacity, 0, 1),

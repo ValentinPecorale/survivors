@@ -49,9 +49,11 @@
   "projects": [
     {
       "title": "La Posada Del Tano",
-      "tag": "Branding",
+      "tag": "Branding, Website, AI Development",
       "image": "/images/featured/posada.webp",
-      "href": ""
+      "href": "",
+      "description": "Lorem ipsum dolor sit amet consectetur adipiscing elit Ut et massa mi. asdsadsad",
+      "date": "03/2026"
     },
     {
       "title": "Oberá",
