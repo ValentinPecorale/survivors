@@ -53,7 +53,5 @@ export default config({
         itemLabel: props => props.value,
       }),
     }),
-    services: intro('Services — opening frame', 'src/content/sections/services'),
-    work: intro('Work — opening frame', 'src/content/sections/work'),
   },
 })

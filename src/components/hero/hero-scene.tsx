@@ -17,6 +17,7 @@ import { projectedBounds, type TigerFrame } from "./camera-framing"
 import { useAsciiHover } from "./ascii-hover"
 import { Tiger } from "./tiger"
 import { getCardSettings, scrollCamera } from "../card-settings"
+import { skyLook, stepSky } from "./sky-look"
 import { asciiConfig, columnsFor } from "./ascii-config"
 import { FloorText } from "./floor-text"
 
@@ -265,6 +266,12 @@ function Plants({ settings, orbitTarget, subjectFrame }: { settings: ModelSettin
       const phase = settings.repeat === "pingpong" && Math.abs(landingLoops.current) % 2 === 1 ? landingKeys.duration - time : time
       const heightOffset = landing.evaluate(phase)[0]
       camera.position.y += heightOffset * settings.landingStrength * (1 - blend01)
+      camera.updateMatrixWorld(true)
+    }
+    // Sky view: tilt up after everything else has placed the camera (see sky-look.ts).
+    const sky = stepSky(delta, state.reduced)
+    if (sky > 0) {
+      camera.rotateX(THREE.MathUtils.degToRad(skyLook.pitchDeg) * sky)
       camera.updateMatrixWorld(true)
     }
     spin.current += THREE.MathUtils.degToRad(settings.spin) * delta

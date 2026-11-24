@@ -17,20 +17,20 @@ export const defaultCamera = {
 
 export const defaultText = {
   textPresetVersion: 1,
-  textEnabled: true, floorText: "survivors", textFontSize: 308, textColor: "#f5f5f0",
+  textEnabled: true, floorText: "survivors", textFontSize: 247, textColor: "#f5f5f0",
   textX: 0, textZ: 0, textHeight: 0.015, textRotation: 90, textTilt: 0,
-  textStartFontSize: 8, textScrollStart: 0, textScrollEnd: 100,
+  textStartFontSize: 8, textScrollStart: 12, textScrollEnd: 100,
   textEase: "linear",
-  textAsciiColumns: 152, textAsciiEndColumns: 152, textAsciiBlackPoint: 0, textAsciiWhitePoint: 0.93,
+  textAsciiColumns: 40, textAsciiEndColumns: 140, textAsciiBlackPoint: 0, textAsciiWhitePoint: 0.93,
 }
 
 export const defaultModel = {
   tigerMaterial: "chrome", tigerColor: "#ffffff", tigerRoughness: 0.04, tigerMetalness: 1, tigerWireframe: false, tigerReflection: 1, tigerStudioRotation: 0,
   tigerVisible: true, tigerScale: 1, tigerX: 0, tigerY: 0, tigerZ: 0, tigerRotation: 0,
   playing: true, speed: 1, repeat: "loop", start: 0,
-  stepSound: false, stepVolume: 0.5, stepOffset: 0,
+  stepSound: true, stepVolume: 0.32, stepOffset: 0,
   audioPresetVersion: 1,
-  hoverSound: false, hoverVolume: 0.5, hoverTrack: "digital",
+  hoverSound: true, hoverVolume: 0.18, hoverTrack: "digital",
   ambientSound: true, ambientVolume: 0.4, ambientTrack: "cowboy",
   rotationX: 0, rotationY: 0, rotationZ: 0,
   positionX: 0, positionY: 0, positionZ: 0, scale: 1, spin: 0,

@@ -117,7 +117,7 @@ function drawPoster(canvas: HTMLCanvasElement, settings: GradientSettings, aspec
 }
 
 /** `idle.current` true = the gradient is invisible right now (between words), so skip drawing it. */
-export function MeshGradient({ settings, surface, box, idle, stretch = false }: { settings: GradientSettings; surface: RefObject<HTMLElement | null>; box: RefObject<HTMLElement | null>; idle: { current: boolean }; stretch?: boolean }) {
+export function MeshGradient({ settings, surface, box, idle, stretch = false, maxWidth = Infinity }: { settings: GradientSettings; surface: RefObject<HTMLElement | null>; box: RefObject<HTMLElement | null>; idle: { current: boolean }; stretch?: boolean; maxWidth?: number }) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const posterRef = useRef<HTMLCanvasElement>(null)
   const live = useRef(settings)
@@ -175,7 +175,7 @@ export function MeshGradient({ settings, surface, box, idle, stretch = false }: 
     }
     const resize = () => {
       const w = Math.max(1, element.clientWidth), h = Math.max(1, element.clientHeight)
-      const ratio = Math.min(devicePixelRatio || 1, 1.5)
+      const ratio = Math.min(devicePixelRatio || 1, 1.5, maxWidth / w)
       canvas.width = Math.round(w * ratio); canvas.height = Math.round(h * ratio)
       gl.viewport(0, 0, canvas.width, canvas.height)
       // Setting canvas.width clears it. The typewriter resizes the box on every keypress, so redraw right here:
@@ -222,7 +222,7 @@ export function MeshGradient({ settings, surface, box, idle, stretch = false }: 
       canvas.removeEventListener("webglcontextlost", contextLost); document.removeEventListener("visibilitychange", visibility)
       gl.deleteBuffer(buffer); gl.deleteProgram(program); shaders.forEach(shader => gl.deleteShader(shader))
     }
-  }, [surface, box, idle, stretch])
+  }, [surface, box, idle, stretch, maxWidth])
 
   return <><canvas ref={posterRef} className="mesh-poster" /><canvas ref={canvasRef} className="mesh-canvas" /></>
 }

@@ -157,7 +157,11 @@ export function AsciiVideoRuntime({ config, sources, className, fps = DEFAULT_FP
         }
         raf = requestAnimationFrame(tick)
       })
-      .catch(() => !cancelled && setMode("fallback"))
+      .catch(error => {
+        // Not silent: this is why a slot shows the plain colour video instead of the ASCII.
+        console.warn("[ascii] the WebGPU effect could not start, showing the plain video instead:", error)
+        if (!cancelled) setMode("fallback")
+      })
 
     return () => {
       cancelled = true

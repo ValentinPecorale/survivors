@@ -29,19 +29,19 @@ export const defaultCardSettings = {
   /** Wheel distance multiplier for scrolling inside an open card. */
   scrollSpeed: 1,
   /** Open by nav button: time for the card to slide from off-screen to fully in. */
-  openMs: 1500,
+  openMs: 850,
   /** Easing of the open slide. Default is quartic ease-in: accelerates and stops sharply. */
-  openEase: [0.5, 0, 0.75, 0] as Bezier,
+  openEase: [0.16, 1, 0.3, 1] as Bezier,
   /** Wait between the trigger (button or letter key) and the slide starting. */
   openDelayMs: 0,
   /** The nav unlocks this long before the open slide ends, so the next press can start as it lands. */
   unlockMs: 100,
   /** Close (button, Esc, wordmark): time for a fully open card to slide out. Half-open cards take proportionally less. */
-  closeMs: 1500,
+  closeMs: 850,
   /** Delay between one card leaving and the next one under it starting to leave. */
   closeStaggerMs: 70,
   /** Easing of the close slide. Default is the same quartic ease-in as the open slide. */
-  closeEase: [0.5, 0, 0.75, 0] as Bezier,
+  closeEase: [0.16, 1, 0.3, 1] as Bezier,
 }
 export type CardSettings = typeof defaultCardSettings
 
@@ -56,8 +56,8 @@ export const easePresets: [string, Bezier][] = [
   ["Ease in-out · expo", [0.87, 0, 0.13, 1]],
 ]
 
-const STORAGE_KEY = "survivors:card-settings:v2"
-const LEGACY_STORAGE_KEY = "survivors:card-settings:v1"
+const STORAGE_KEY = "survivors:card-settings:v3"
+// Presets saved before the defaults were baked into the code (v1, v2) are ignored on purpose: they held old experiments that made the deployed site differ from local.
 const easeCache = new Map<string, (t: number) => number>()
 
 /** Cached easing function for a bezier. */
@@ -93,7 +93,7 @@ const num = (v: unknown, fallback: number, min: number, max: number) => typeof v
 export function loadCardSettings() {
   try {
     const currentPreset = localStorage.getItem(STORAGE_KEY)
-    const raw = currentPreset ?? localStorage.getItem(LEGACY_STORAGE_KEY)
+    const raw = currentPreset
     if (!raw) return
     const saved = JSON.parse(raw) as Partial<Record<keyof CardSettings, unknown>>
     const d = defaultCardSettings

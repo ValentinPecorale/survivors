@@ -1,22 +1,24 @@
 "use client"
 
-import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react"
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
-import { sections, sectionFromPath, SectionContent, type SectionId } from "./sections"
+import { sections, navItems, sectionFromPath, SectionContent, type SectionId } from "./sections"
 import { createCardEngine } from "./card-engine"
-import { getCardSettings, loadCardSettings, useCardSettings } from "./card-settings"
+import { getCardSettings, loadCardSettings, scrollCamera, useCardSettings } from "./card-settings"
 import { loadGradientSettings } from "./gradient-settings"
 import { SoundToggle } from "./sound-toggle"
-import { SectionLine } from "./section-line"
 import { SHORTCUT_KEYS, SOUND_KEY } from "./shortcuts"
 import { toggleAudio } from "./hero/sound"
+import { setSkyLook, toggleSkyLook, skyLooking, scrubSky } from "./hero/sky-look"
 
 /** Scroll distance for one full slide, as a fraction of viewport height. 1:1 and linear. */
 const SCROLL_TRAVEL = 0.8
 /** Keyboard scrolling: one arrow press moves this many px (holding repeats); PageUp / PageDown move this share of the screen. */
 const KEY_STEP = 100
 const KEY_PAGE = 0.85
+/** A pause this long in scroll input ends a gesture. Short on purpose: a fresh scroll up from the side view must feel instant. */
+const GESTURE_GAP_MS = 120
 
 /**
  * Centered nav over the hero. Each link owns one full-screen card (three max)
@@ -64,25 +66,78 @@ export function Navbar({ children }: { children: ReactNode }) {
   }, [pathname, engine])
   useEffect(() => () => engine.destroy(), [engine])
 
+  // One page: every nav button but Learnings is a place inside the About card. Open the card if it is not in front, then bring the anchor to its top edge.
+  const goRaf = useRef(0)
+  const [anchor, setAnchor] = useState<string | undefined>()
+  const go = useCallback((card: SectionId, selector?: string) => {
+    cancelAnimationFrame(goRaf.current)
+    setSkyLook(false)
+    const frontEl = () => Array.from(document.querySelectorAll<HTMLElement>(".site-card:not([data-closing])")).pop()
+    const offsetOf = (el: HTMLElement, target: HTMLElement) => target.getBoundingClientRect().top - el.getBoundingClientRect().top + el.scrollTop
+    const inFront = engine.snapshot().filter(c => !c.closing).at(-1)?.id === card
+    if (inFront) {
+      const el = frontEl(), target = selector ? el?.querySelector<HTMLElement>(selector) : null
+      if (!el || !target || !engine.frontSettled()) return
+      // Glide there: ease-in-out, 0.9s plus 80ms per screen travelled (cap 2.2s). Any other scroll input (wheel, drag) cancels it.
+      const from = el.scrollTop, to = Math.max(0, Math.min(el.scrollHeight - el.clientHeight, offsetOf(el, target)))
+      const dur = Math.min(2200, 900 + Math.abs(to - from) / window.innerHeight * 80)
+      const start = performance.now()
+      let written = from
+      const step = (now: number) => {
+        if (Math.abs(el.scrollTop - written) > 2) return
+        const u = Math.min(1, (now - start) / dur)
+        el.scrollTop = from + (to - from) * (u < 0.5 ? 4 * u ** 3 : 1 - (-2 * u + 2) ** 3 / 2)
+        written = el.scrollTop
+        if (u < 1) goRaf.current = requestAnimationFrame(step)
+      }
+      goRaf.current = requestAnimationFrame(step)
+      return
+    }
+    engine.open(card)
+    if (!selector) return
+    // The card is still sliding in: park its scroll position behind the slide, so it arrives already in place.
+    const deadline = performance.now() + 8000
+    const locate = () => {
+      const el = frontEl(), target = el?.querySelector<HTMLElement>(selector)
+      if (el && target && !el.hasAttribute("inert")) el.scrollTop = offsetOf(el, target)
+      if (!(target && engine.frontSettled()) && performance.now() < deadline) goRaf.current = requestAnimationFrame(locate)
+    }
+    goRaf.current = requestAnimationFrame(locate)
+  }, [engine])
+  useEffect(() => () => cancelAnimationFrame(goRaf.current), [])
+  useEffect(() => {
+    const here = (event: Event) => go("about", `[data-anchor="${(event as CustomEvent<string>).detail}"]`)
+    window.addEventListener("survivors:go", here)
+    return () => window.removeEventListener("survivors:go", here)
+  }, [go])
+  useEffect(() => {
+    const show = () => go("about", "#clients")
+    window.addEventListener("survivors:show-clients", show)
+    return () => window.removeEventListener("survivors:show-clients", show)
+  }, [go])
+
+  // Which anchor the front card is showing: the last marker that has reached its top edge. Lights the matching nav button.
   useEffect(() => {
     let raf = 0
-    const showClients = () => {
-      cancelAnimationFrame(raf)
-      engine.open("about")
-      const deadline = performance.now() + 8000
-      const locate = () => {
-        const target = document.querySelector<HTMLElement>(".site-card:not([inert]) #clients")
-        const card = target?.closest<HTMLElement>(".site-card")
-        if (target && card && engine.frontSettled()) {
-          card.scrollTop += target.getBoundingClientRect().top - card.getBoundingClientRect().top
-          return
-        }
-        if (performance.now() < deadline) raf = requestAnimationFrame(locate)
-      }
-      raf = requestAnimationFrame(locate)
+    const measure = () => {
+      raf = 0
+      const el = Array.from(document.querySelectorAll<HTMLElement>(".site-card:not([data-closing])")).pop()
+      if (!el) { setAnchor(undefined); return }
+      const edge = el.getBoundingClientRect().top + 4
+      const hit = Array.from(el.querySelectorAll<HTMLElement>("[data-anchor]")).filter(m => m.getBoundingClientRect().top <= edge).at(-1)
+      setAnchor(hit?.dataset.anchor)
     }
-    window.addEventListener("survivors:show-clients", showClients)
-    return () => { cancelAnimationFrame(raf); window.removeEventListener("survivors:show-clients", showClients) }
+    const queue = () => { if (!raf) raf = requestAnimationFrame(measure) }
+    window.addEventListener("scroll", queue, true)
+    queue()
+    return () => { cancelAnimationFrame(raf); window.removeEventListener("scroll", queue, true) }
+  }, [cards])
+
+  // Contact: clear the cards, then tilt the hero camera up to the sky. Pressing it again (or Home / Esc / any section) looks back down.
+  const contact = useCallback(() => {
+    if (skyLooking()) { setSkyLook(false); return }
+    engine.closeAll()
+    toggleSkyLook()
   }, [engine])
 
   const { openMs, openDelayMs } = useCardSettings()
@@ -101,11 +156,10 @@ export function Navbar({ children }: { children: ReactNode }) {
 
 
   useEffect(() => {
-    if (!hasCards) return
-    const onKey = (event: KeyboardEvent) => { if (event.key === "Escape") engine.closeAll() }
+    const onKey = (event: KeyboardEvent) => { if (event.key === "Escape") { setSkyLook(false); engine.closeAll() } }
     window.addEventListener("keydown", onKey)
     return () => window.removeEventListener("keydown", onKey)
-  }, [hasCards, engine])
+  }, [engine])
 
   // Pressing a section's letter opens its card instantly, same slide as the nav button. No hold.
   useEffect(() => {
@@ -114,13 +168,14 @@ export function Navbar({ children }: { children: ReactNode }) {
     const down = (event: KeyboardEvent) => {
       if (event.repeat || event.ctrlKey || event.metaKey || event.altKey || editable(event.target)) return
       if (event.key.toLowerCase() === SOUND_KEY) { toggleAudio(); return }
-      if (event.key.toLowerCase() === SHORTCUT_KEYS[0]) { engine.closeAll(); return }
-      const section = sections.find(s => s.key === event.key.toLowerCase())
-      if (section) engine.open(section.id)
+      if (event.key.toLowerCase() === SHORTCUT_KEYS[0]) { setSkyLook(false); engine.closeAll(); return }
+      if (event.key === " " && !(event.target instanceof HTMLElement && event.target.closest("button, a"))) { event.preventDefault(); contact(); return }
+      const item = navItems.find(n => n.key === event.key.toLowerCase())
+      if (item) go(item.card, item.anchor && `[data-anchor="${item.anchor}"]`)
     }
     window.addEventListener("keydown", down)
     return () => window.removeEventListener("keydown", down)
-  }, [engine])
+  }, [engine, go, contact])
 
   useEffect(() => {
     const touch = { y: null as number | null }
@@ -172,13 +227,31 @@ export function Navbar({ children }: { children: ReactNode }) {
     }
     const ignored = (target: EventTarget | null) => target instanceof Element && !!target.closest(".properties-panel, .properties-launcher, input, select, textarea")
     const travel = () => window.innerHeight * SCROLL_TRAVEL
-
+    // Side view is the start. Scrolling up on the bare hero scrubs straight to the sky, no extra steps.
+    // The one exception: the swipe that brings the camera back from the zenith ends at the side view. Its remaining input (and the trackpad
+    // momentum behind it) is swallowed until a new gesture begins: a pause of GESTURE_GAP_MS, a scroll the other way, or a flick harder than the tail before it.
+    const gesture = { last: 0, mag: 0, locked: false }
+    const skyScroll = (pixels: number) => {
+      if (engine.snapshot().some(c => !c.closing) || scrollCamera.progress > 0.001) { gesture.locked = true; return false }
+      if (gesture.locked) {
+        const newGesture = pixels > 0 || performance.now() - gesture.last > GESTURE_GAP_MS || Math.abs(pixels) > gesture.mag * 1.4 + 4
+        if (!newGesture) return true
+        gesture.locked = false
+      }
+      if (pixels < 0 || skyLooking()) { scrubSky(-pixels / travel()); return true }
+      return false
+    }
+    const stamp = (event: Event) => {
+      gesture.last = performance.now()
+      if (event instanceof WheelEvent) gesture.mag = Math.abs(event.deltaY) * (event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? window.innerHeight : 1)
+    }
     const onWheel = (event: WheelEvent) => {
       if (event.ctrlKey || ignored(event.target) || Math.abs(event.deltaY) < Math.abs(event.deltaX)) return
       // Normalize line/page wheel modes to pixels.
       const pixels = event.deltaY * (event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? window.innerHeight : 1)
       event.preventDefault()
       if (!pixels || (engine.frontReached() && !engine.frontSettled()) || scrollContent(pixels)) return
+      if (skyScroll(pixels)) return
       engine.scrub(pixels / travel())
     }
     // Keyboard: Arrow Up / Down and Page Up / Down scroll exactly like the mouse wheel (same routing, same smoothing and speed),
@@ -191,6 +264,7 @@ export function Navbar({ children }: { children: ReactNode }) {
       if (!pixels) return
       event.preventDefault()
       if ((engine.frontReached() && !engine.frontSettled()) || scrollContent(pixels)) return
+      if (skyScroll(pixels)) return
       engine.scrub(pixels / travel())
     }
     const onTouchStart = (event: TouchEvent) => { touch.y = ignored(event.target) ? null : event.touches[0].clientY }
@@ -203,17 +277,25 @@ export function Navbar({ children }: { children: ReactNode }) {
       if (engine.frontReached() && !engine.frontSettled()) { event.preventDefault(); return }
       if (!delta || scrollContent(delta, false)) return
       event.preventDefault()
+      if (skyScroll(delta)) return
       engine.scrub(delta / travel())
     }
     window.addEventListener("wheel", onWheel, { passive: false })
     window.addEventListener("keydown", onKey)
     window.addEventListener("touchstart", onTouchStart, { passive: true })
     window.addEventListener("touchmove", onTouchMove, { passive: false })
+    // Registered last, so each handler above sees the previous input's time and size.
+    window.addEventListener("keydown", stamp, { passive: true })
+    window.addEventListener("wheel", stamp, { passive: true })
+    window.addEventListener("touchmove", stamp, { passive: true })
     return () => {
       window.removeEventListener("wheel", onWheel)
       window.removeEventListener("keydown", onKey)
       window.removeEventListener("touchstart", onTouchStart)
       window.removeEventListener("touchmove", onTouchMove)
+      window.removeEventListener("keydown", stamp)
+      window.removeEventListener("wheel", stamp)
+      window.removeEventListener("touchmove", stamp)
     }
   }, [engine])
 
@@ -223,20 +305,19 @@ export function Navbar({ children }: { children: ReactNode }) {
         <nav aria-label="Primary">
           <ul>
             <li>
-              <Link href="/" scroll={false} aria-current={!hasCards ? "page" : undefined} aria-keyshortcuts={SHORTCUT_KEYS[0].toUpperCase()} onNavigate={event => { event.preventDefault(); engine.closeAll() }}><span>Home</span><kbd aria-hidden="true">[{SHORTCUT_KEYS[0].toUpperCase()}]</kbd></Link>
+              <Link href="/" scroll={false} aria-current={!hasCards ? "page" : undefined} aria-keyshortcuts={SHORTCUT_KEYS[0].toUpperCase()} onNavigate={event => { event.preventDefault(); setSkyLook(false); engine.closeAll() }}><span>Home</span><kbd aria-hidden="true">[{SHORTCUT_KEYS[0].toUpperCase()}]</kbd></Link>
             </li>
-            {sections.map(s => (
+            {navItems.map(s => (
               <li key={s.id}>
-                <Link href={`/${s.id}`} scroll={false} aria-current={top?.id === s.id ? "page" : undefined} aria-keyshortcuts={s.key.toUpperCase()} aria-disabled={locked || undefined} onNavigate={event => { event.preventDefault(); if (!locked) engine.open(s.id) }}><span>{s.label}</span><kbd aria-hidden="true">[{s.key.toUpperCase()}]</kbd></Link>
+                <Link href={`/${s.card}${s.anchor ? `#${s.anchor}` : ""}`} scroll={false} aria-current={top?.id === s.card && (!s.anchor || anchor === s.anchor) ? "page" : undefined} aria-keyshortcuts={s.key.toUpperCase()} aria-disabled={locked || undefined} onNavigate={event => { event.preventDefault(); if (!locked) go(s.card, s.anchor && `[data-anchor="${s.anchor}"]`) }}><span>{s.label}</span><kbd aria-hidden="true">[{s.key.toUpperCase()}]</kbd></Link>
               </li>
             ))}
             <li>
-              <button type="button" aria-keyshortcuts="Space"><span>Contact</span><kbd aria-hidden="true">[SPACE]</kbd></button>
+              <button type="button" aria-keyshortcuts="Space" onClick={contact}><span>Contact</span><kbd aria-hidden="true">[SPACE]</kbd></button>
             </li>
             <li><SoundToggle /></li>
           </ul>
         </nav>
-        <SectionLine className="section-line--abs" style={{ bottom: 0 }} />
       </header>
       {/* Keep the route outlet rendered even when Home has no card. The page
           can return null, but Next still needs to visit its segment boundary. */}

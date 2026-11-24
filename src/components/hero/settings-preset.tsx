@@ -3,7 +3,7 @@
 import { useEffect, useRef, type Dispatch, type SetStateAction } from "react"
 import { defaultAscii, defaultModel, defaultText, type AsciiSettings, type ModelSettings } from "./live-settings"
 
-const STORAGE_KEY = "survivors:default-settings:v2"
+const STORAGE_KEY = "survivors:default-settings:v3"
 
 type SavedSettings = { ascii: AsciiSettings; model: ModelSettings }
 

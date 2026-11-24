@@ -1,0 +1,45 @@
+{
+  "text": "Survivors is more than a brand. It's a mindset. Built for those who keep moving, push boundaries, and refuse to give up. No matter the odds, we survive. Stay alive. Stay a survivor.",
+  "call": {
+    "label": "Send a flare",
+    "href": ""
+  },
+  "socials": [
+    {
+      "label": "Discord",
+      "href": ""
+    },
+    {
+      "label": "Linked In",
+      "href": ""
+    },
+    {
+      "label": "Github",
+      "href": ""
+    }
+  ],
+  "location": "Mar del Plata Argentina",
+  "copyright": "© 2026 Survivors. All rights reserved.",
+  "links": [
+    {
+      "label": "home",
+      "href": "/"
+    },
+    {
+      "label": "about",
+      "href": "#about"
+    },
+    {
+      "label": "services",
+      "href": "#services"
+    },
+    {
+      "label": "work",
+      "href": "#work"
+    },
+    {
+      "label": "contact",
+      "href": ""
+    }
+  ]
+}

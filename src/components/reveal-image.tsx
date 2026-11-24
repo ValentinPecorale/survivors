@@ -1,13 +1,20 @@
 "use client";
 
 /**
- * RevealImage — instant image reveal in two global phases.
+ * RevealImage — instant image reveal.
  *
- *   1. hidden → GLYPHS   a symbol grid fills the whole box (you pick the columns)
- *   2. glyphs → CELLS    the real image lands cell by cell on top of the glyphs
+ *   mode="glyphs" (default):  hidden → GLYPHS → PIXELS
+ *       1. a symbol grid fills the whole box (you pick the columns)
+ *       2. the real image lands pixel by pixel on top of the glyphs
+ *   mode="pixels":            hidden → PIXELS only. No glyph phase, no hold.
  *
- * The glyph grid and the image cell grid are independent: e.g. 40 glyph columns
- * under 32px image cells.
+ * Pixel (image-cell) sizes — `cellMode`:
+ *   "uniform" every pixel is `cell` px · "random" random sizes from `cell` to `cellMax`
+ *   (`split` = mix) · "detail" small where the image has detail, big where it is flat.
+ *   Sizes step ×2 (cell, 2×cell, 4×cell…) and always tile the box with no gaps.
+ *
+ * The glyph grid and the pixel grid are independent: e.g. 40 glyph columns
+ * under 32px pixels.
  *
  * EFFECT ONLY. Renders a wrapper <div> that fills its parent (width/height 100%)
  * holding two stacked <canvas>es. No border-radius, shadow, aspect-ratio, margin
@@ -26,7 +33,7 @@
  *   </div>
  */
 
-import { useEffect, useRef, type CSSProperties, type ReactNode } from "react";
+import { useEffect, useRef, type CSSProperties } from "react";
 
 export const CHARSETS = {
   symbols: "!<>-_\\/[]{}=+*^?#%&@$~|:;",
@@ -42,8 +49,26 @@ export type Settings = {
   glyphDuration: number;
   /** ms the complete glyph field sits before the image cells start */
   hold: number;
-  /** target image-cell size in CSS px. cell grid = box size / cell */
+  /**
+   * "glyphs" = hidden → glyphs → pixels (the glyph phase, then the hold, then the pixels)
+   * "pixels" = hidden → pixels only. No glyph phase, no hold: the real image pixels land straight away.
+   */
+  mode: "glyphs" | "pixels";
+  /**
+   * How pixel (image-cell) sizes are chosen:
+   *   "uniform" = every pixel is `cell` px
+   *   "random"  = random sizes between `cell` and `cellMax` (see `split`)
+   *   "detail"  = small pixels where the image has detail, big where it is flat (see `detail`)
+   */
+  cellMode: "uniform" | "random" | "detail";
+  /** pixel size in CSS px. uniform: the size of every pixel · random/detail: the SMALLEST size */
   cell: number;
+  /** random/detail: the LARGEST pixel size in CSS px. sizes step by ×2: cell, 2×cell, 4×cell… up to this */
+  cellMax: number;
+  /** random: chance (0–1) that a block splits into four smaller ones. low = mostly big, high = mostly small */
+  split: number;
+  /** detail: local contrast (0–1) above which a block splits. low = splits easily (more small pixels) */
+  detail: number;
   /** ms for all image cells to land (after the hold) */
   duration: number;
   /** "random" = shuffled · "linear" = reading order, top-left first (both phases) */
@@ -75,20 +100,25 @@ export type Settings = {
 /*DEFAULTS*/
 const DEFAULTS: Settings = {
   glyphCols: 36,
-  glyphDuration: 400,
-  hold: 50,
-  cell: 32,
-  duration: 900,
+  glyphDuration: 700,
+  hold: 300,
+  mode: "pixels",
+  cellMode: "random",
+  cell: 26,
+  cellMax: 190,
+  split: 0.74,
+  detail: 0.2,
+  duration: 600,
   order: "random",
-  steps: 16,
+  steps: 6,
   skew: 1,
   seed: 7,
   cycle: 60,
   charset: "symbols",
   ghost: 0,
   tint: true,
-  glyphLayer: "underlay",
-  cover: "#0a0d10",
+  glyphLayer: "draw",
+  cover: "#000000",
 };
 /*END DEFAULTS*/
 
@@ -106,7 +136,7 @@ export type RevealImageProps = Partial<Settings> & {
   replayKey?: string | number;
   onDone?: () => void;
   /** glyphLayer="underlay": the layer that gets uncovered (e.g. <ShaderLabComposition/>) */
-  children?: ReactNode;
+  children?: React.ReactNode;
 };
 
 function mulberry32(seed: number) {
@@ -199,6 +229,75 @@ function paintGhost(ctx: CanvasRenderingContext2D, img: HTMLImageElement, L: Lay
   ctx.globalAlpha = 1;
 }
 
+type Tile = { c: number; r: number; w: number; h: number }; // in grid units
+
+/**
+ * The pixels. Every tile is a rectangle of whole grid units, so tiles share integer
+ * device-pixel edges and abut with no seams, whatever their sizes.
+ *
+ * uniform → one tile per grid unit.
+ * random / detail → a quadtree: start from big blocks (`cellMax`) and recursively split a
+ * block into four, stopping at the smallest size (`cell`). `random` flips a coin per block,
+ * `detail` splits where the image has local contrast. Sizes therefore step ×2.
+ */
+function buildTiles(img: HTMLImageElement, L: Layout, s: Settings): Tile[] {
+  const { cols, rows } = L.cells;
+  const tiles: Tile[] = [];
+
+  if (s.cellMode === "uniform") {
+    for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) tiles.push({ c, r, w: 1, h: 1 });
+    return tiles;
+  }
+
+  const levels = Math.max(0, Math.min(5, Math.floor(Math.log2(Math.max(s.cellMax, s.cell) / s.cell))));
+  const top = 2 ** levels;
+  const rand = mulberry32(s.seed + 101); // own stream: pixel sizes don't change when the order is re-rolled
+
+  // detail: luminance at one sample per grid unit
+  let lum: Float32Array | null = null;
+  if (s.cellMode === "detail") {
+    const px = sampleColors(img, L, L.cells);
+    if (px) {
+      lum = new Float32Array(cols * rows);
+      for (let i = 0; i < lum.length; i++) {
+        lum[i] = (0.299 * px[i * 4] + 0.587 * px[i * 4 + 1] + 0.114 * px[i * 4 + 2]) / 255;
+      }
+    }
+  }
+  const contrast = (c: number, r: number, w: number, h: number) => {
+    let lo = 1, hi = 0;
+    for (let y = r; y < r + h; y++) {
+      for (let x = c; x < c + w; x++) {
+        const v = lum![y * cols + x];
+        if (v < lo) lo = v;
+        if (v > hi) hi = v;
+      }
+    }
+    return hi - lo;
+  };
+
+  const visit = (c: number, r: number, size: number) => {
+    const w = Math.min(size, cols - c);
+    const h = Math.min(size, rows - r);
+    // a tile can't be split below one grid unit
+    const wantSplit =
+      size > 1 && (lum ? contrast(c, r, w, h) > s.detail : rand() < s.split);
+    if (!wantSplit) {
+      tiles.push({ c, r, w, h });
+      return;
+    }
+    const half = size / 2;
+    for (const [dc, dr] of [[0, 0], [half, 0], [0, half], [half, half]]) {
+      if (c + dc < cols && r + dr < rows) visit(c + dc, r + dr, half);
+    }
+  };
+  for (let r = 0; r < rows; r += top) for (let c = 0; c < cols; c += top) visit(c, r, top);
+
+  // reading order, so order="linear" runs top-left → bottom-right whatever the sizes
+  tiles.sort((a, b) => a.r - b.r || a.c - b.c);
+  return tiles;
+}
+
 /** seeded order + skew-warped, step-quantised buckets over [0, duration] */
 function schedule(n: number, s: Settings, rand: () => number, duration: number) {
   const order = Array.from({ length: n }, (_, i) => i);
@@ -230,7 +329,7 @@ function start(
   const gctx = glyphCanvas.getContext("2d")!;
   const ictx = imgCanvas.getContext("2d")!;
   const { cells, glyphs, scale, ox, oy } = L;
-  const useGlyphs = s.glyphCols > 0;
+  const useGlyphs = s.mode !== "pixels" && s.glyphCols > 0; // "pixels" = skip the glyph phase entirely
   const fallback = getComputedStyle(wrap).color || "#fff";
   const pool = CHARSETS[s.charset] ?? CHARSETS.symbols;
   const pick = () => pool[Math.floor(Math.random() * pool.length)];
@@ -269,11 +368,11 @@ function start(
   };
 
   // ── image layer ──────────────────────────────────────────────────────────
+  const tiles = buildTiles(img, L, s);
   const drawCell = (i: number) => {
-    const c = i % cells.cols;
-    const r = (i / cells.cols) | 0;
-    const x = cells.xs[c], y = cells.ys[r];
-    const w = cells.xs[c + 1] - x, h = cells.ys[r + 1] - y;
+    const t = tiles[i];
+    const x = cells.xs[t.c], y = cells.ys[t.r];
+    const w = cells.xs[t.c + t.w] - x, h = cells.ys[t.r + t.h] - y;
     ictx.clearRect(x, y, w, h);
     ictx.drawImage(img, (x - ox) / scale, (y - oy) / scale, w / scale, h / scale, x, y, w, h);
   };
@@ -282,7 +381,7 @@ function start(
   const rand = mulberry32(s.seed);
   const glyphSteps = useGlyphs ? schedule(gn, s, rand, s.glyphDuration) : [];
   const cellStart = useGlyphs ? s.glyphDuration + s.hold : 0;
-  const cellSteps = schedule(cells.cols * cells.rows, s, rand, s.duration).map((b) => ({
+  const cellSteps = schedule(tiles.length, s, rand, s.duration).map((b) => ({
     ...b,
     at: b.at + cellStart,
   }));
