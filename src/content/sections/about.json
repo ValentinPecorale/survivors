@@ -1,0 +1,79 @@
+{
+  "heading": "We make things to last.",
+  "text": "We’re a design studio bringing humanity back to brands and screens. Every project carries a piece of the people behind it, so when we’re gone, it stays. That’s why it survives.",
+  "whatLabel": "What we do",
+  "whatText": "We design brands and build what they need to grow. That means visual identities with a clear point of view, custom AI photo studios that create on-brand imagery on demand, design systems your AI agents can follow, and websites designed with care and built to perform.",
+  "words": [
+    "Branding",
+    "Websites",
+    "Interior Design",
+    "AI Photo Studio"
+  ],
+  "whoLabel": "Who we are",
+  "whoText": "We’re a small studio from Mar del Plata, a city by the sea, made up of people who care a little too much about the details. We’re designers and builders, curious by nature and stubborn about craft. We’d rather make one thing that lasts than ten that disappear, and we put a piece of ourselves into all of it.",
+  "whoTag": "We are survivors.",
+  "projectsTitle": "Featured Projects",
+  "projectsText": "Every project here started with someone who cared as much as we did. We took our time, sweated the small things, and argued over details nobody else would notice. These are the ones we are proudest of, the ones we would happily make all over again, and the ones we hope will still be standing years from now.",
+  "logosLabel": "Trusted by",
+  "logos": [
+    {
+      "id": "obera",
+      "name": "Oberá",
+      "href": ""
+    },
+    {
+      "id": "tpg",
+      "name": "TPG Mayorista",
+      "href": ""
+    },
+    {
+      "id": "posada",
+      "name": "La Posada Del Tano",
+      "href": ""
+    },
+    {
+      "id": "becerro",
+      "name": "Becerro Inmobiliaria",
+      "href": ""
+    },
+    {
+      "id": "quiero",
+      "name": "Quiero misREDES",
+      "href": ""
+    }
+  ],
+  "clients": [
+    "Oberá",
+    "La Posada Del Tano",
+    "Quiero Mis Redes",
+    "Becerro Inmobiliaria"
+  ],
+  "projects": [
+    {
+      "title": "La Posada Del Tano",
+      "tag": "Branding, Website, AI Development",
+      "image": "/images/featured/posada.webp",
+      "href": "",
+      "description": "Design and development for a Family \"Quincho\" rental venue in Mar del Plata, Argentina — built around a single question: how does an adult remember their childhood at a family celebration? Every visual and verbal decision stems from that answer.",
+      "date": "03/2026"
+    },
+    {
+      "title": "Oberá",
+      "tag": "Branding",
+      "image": "/images/featured/obera.webp",
+      "href": ""
+    },
+    {
+      "title": "Project name",
+      "tag": "Category",
+      "image": "",
+      "href": ""
+    },
+    {
+      "title": "Project name",
+      "tag": "Category",
+      "image": "",
+      "href": ""
+    }
+  ]
+}

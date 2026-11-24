@@ -1,0 +1,108 @@
+/* HDR maps, materials and the render loop are mutable Three.js resources. */
+/* eslint-disable react-hooks/immutability */
+"use client"
+
+import { Canvas, useFrame, useLoader, useThree } from "@react-three/fiber"
+import { useGLTF } from "@react-three/drei"
+import { useLayoutEffect, useMemo, useRef } from "react"
+import * as THREE from "three"
+import { HDRLoader } from "three/addons/loaders/HDRLoader.js"
+import { studioNormalization } from "./hero/chrome-environment"
+import type { GradientSettings } from "./gradient-settings"
+
+/**
+ * The About skull: skull_web.glb (meshopt-compressed, 77KB, 16.8k triangles) with the same chrome as the hero tiger.
+ * "Same material" is the tiger's recipe, not a lookalike: the same Shader Lab studio HDR, the same irradiance
+ * normalisation, the same studio alignment, the same white key light fixed in camera space, and the same
+ * defaults (colour #fff, roughness 0.04, metalness 1). Only the renderer differs: this canvas is plain WebGL, so
+ * it works in browsers that fall back to the static poster in the hero.
+ *
+ * Demand rendering continues only while visible motion is active.
+ */
+
+const SKULL_URL = "/models/skull.glb"
+const STUDIO_URL = "/environments/studio_small_03_1k.hdr"
+/** A long, flat lens (20°): a short one magnifies the face (the nearest surface) well past the Figma proportions. */
+const CAMERA_FOV = 20
+const CAMERA_DISTANCE = 19
+/** Multiplier so that skullSize 90% really fills 90% of the canvas height at the front view. Measured: with the lens above the front view fills 97.3% of the height at FIT 1. */
+const FIT = 0.925
+/** Radians to turn skull_web.glb so its face points at the camera at rotation 0. */
+const FRONT = Math.PI * 1.5
+
+/** Mutable bridge between the scrolling frame (writes velocity/direction) and the canvas (integrates rotation). */
+export type SkullBridge = { angle: number; direction: 1 | -1; velocity: number; scrollTime: number; active: boolean; invalidate: () => void }
+
+type Props = { settings: GradientSettings; bridge: { current: SkullBridge }; onReady: () => void }
+
+function Skull({ settings, bridge, onReady }: Props) {
+  const { scene: shared } = useGLTF(SKULL_URL)
+  // useGLTF caches one scene; an Object3D can belong to only one canvas, so every skull on screen gets its own clone (geometry is still shared).
+  const scene = useMemo(() => shared.clone(true), [shared])
+  const texture = useLoader(HDRLoader, STUDIO_URL)
+  const invalidate = useThree(s => s.invalidate)
+  const group = useRef<THREE.Group>(null)
+  const normalization = useMemo(() => studioNormalization(texture), [texture])
+  // Same studio orientation the tiger uses, so the reflections fall on the same kinds of surface.
+  const alignment = useMemo(() => new THREE.Quaternion().setFromEuler(new THREE.Euler(
+    THREE.MathUtils.degToRad(26.4), THREE.MathUtils.degToRad(-71.8), THREE.MathUtils.degToRad(37.4), "XYZ")).invert(), [])
+  const turn = useMemo(() => new THREE.Quaternion(), [])
+  const axis = useMemo(() => new THREE.Vector3(0, 1, 0), [])
+  const material = useMemo(() => {
+    texture.mapping = THREE.EquirectangularReflectionMapping
+    const m = new THREE.MeshPhysicalMaterial()
+    m.envMap = texture
+    return m
+  }, [texture])
+
+  useLayoutEffect(() => {
+    scene.traverse(object => { if (object instanceof THREE.Mesh) object.material = material })
+    const shared = bridge.current
+    shared.invalidate = invalidate
+    onReady()
+    invalidate()
+    return () => { shared.invalidate = () => {}; material.dispose() }
+  }, [scene, material, bridge, invalidate, onReady])
+
+  useLayoutEffect(() => {
+    material.color.set(settings.skullColor)
+    material.roughness = settings.skullRoughness
+    material.metalness = settings.skullMetalness
+    material.envMapIntensity = settings.skullLight * normalization
+    turn.setFromAxisAngle(axis, THREE.MathUtils.degToRad(settings.skullStudioRotation)).premultiply(alignment)
+    material.envMapRotation.setFromQuaternion(turn)
+    invalidate()
+  }, [material, normalization, alignment, turn, axis, invalidate, settings.skullColor, settings.skullRoughness, settings.skullMetalness, settings.skullLight, settings.skullStudioRotation, settings.skullSize, settings.skullSpeed, settings.skullBoost, settings.skullDecay])
+
+  // The file's front is 270° round from the camera, so offset it: at the start of the scroll the skull faces you.
+  useFrame((_, delta) => {
+    const motion = bridge.current
+    const boost = Math.min(30, motion.velocity / 100 * settings.skullBoost) * Math.exp(-3 * (performance.now() - motion.scrollTime) / settings.skullDecay)
+    if (motion.active) {
+      const rpm = motion.direction * (settings.skullSpeed < 0 ? -1 : 1) * (Math.abs(settings.skullSpeed) + boost)
+      motion.angle = (motion.angle + rpm * Math.PI / 30 * Math.min(delta, 0.05)) % (Math.PI * 2)
+      if (settings.skullSpeed !== 0 || boost > 0.001) invalidate()
+    }
+    if (group.current) group.current.rotation.y = motion.angle + FRONT
+  })
+
+  // Fits the skull's 6.08-unit height to skullSize% of the canvas at the camera distance set below (90% by default).
+  return <group ref={group} scale={settings.skullSize / 90 * FIT}><primitive object={scene} /></group>
+}
+
+/** The tiger's key light: white, intensity 1, fixed in camera space (the camera here never moves). */
+function KeyLight() {
+  return <directionalLight color="#ffffff" intensity={1} position={[-5, 5, 7.07]} />
+}
+
+export function SkullCanvas(props: Props) {
+  return (
+    <Canvas flat frameloop="demand" dpr={[1, 1.5]} camera={{ fov: CAMERA_FOV, position: [0, 0, CAMERA_DISTANCE], near: 0.1, far: 80 }}
+      gl={{ alpha: true, antialias: true, powerPreference: "low-power", preserveDrawingBuffer: true }}
+      // R3F's container takes pointer events by default; this canvas must let them through to the names beneath it.
+      style={{ width: "100%", height: "100%", pointerEvents: "none" }}>
+      <KeyLight />
+      <Skull {...props} />
+    </Canvas>
+  )
+}
