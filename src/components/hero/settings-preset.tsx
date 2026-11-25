@@ -37,6 +37,12 @@ function readDefaultSettings(): SavedSettings | null {
     // Introduce the requested 0.20 resting white point to presets saved before hover existed.
     if (saved.ascii.hoverEnabled === undefined) ascii.signalWhitePoint = 0.2
     const model = mergeSettings(defaultModel, saved.model)
+    // Apply the approved beam density once to older saved presets, preserving other controls.
+    const migrateBeam = saved.model.beamPresetVersion !== defaultModel.beamPresetVersion
+    if (migrateBeam) {
+      model.searchlightDensity = defaultModel.searchlightDensity
+      model.beamPresetVersion = defaultModel.beamPresetVersion
+    }
     if (saved.model.audioPresetVersion !== 1) { model.ambientSound = true; model.audioPresetVersion = 1 }
     // Older presets had a single fixed column count; preserve that look.
     if (saved.model.textAsciiEndColumns === undefined) model.textAsciiEndColumns = model.textAsciiColumns
@@ -50,6 +56,7 @@ function readDefaultSettings(): SavedSettings | null {
         textAsciiBlackPoint: defaultText.textAsciiBlackPoint, textAsciiWhitePoint: defaultText.textAsciiWhitePoint,
       })
     }
+    if (migrateBeam) saveDefaultSettings(ascii, model)
     return { ascii, model }
   } catch { return null }
 }

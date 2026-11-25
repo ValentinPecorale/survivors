@@ -25,11 +25,13 @@ export const defaultText = {
 }
 
 export const defaultSearchlights = {
+  beamPresetVersion: 1,
   searchlights: true, searchlightColor: "#f5f5f0",
   searchlightDotSize: 0, searchlightSpacing: 0, searchlightDensity: 0.7,
   lampFlicker: true, lampFlickerEvery: 10, lampFlickerCount: 2, // while the lamp is on, the failing-bulb effect repeats: every N seconds, this many dark flicks
   contactMusic: true, contactTrack: "loop", contactMusicVolume: 0.5, contactMusicDelay: 0, contactMusicFadeIn: 1.5, contactMusicFadeOut: 1, // loops for as long as the Contact (sky) view is up
   humSound: true, humVolume: 0.5, humDelay: 0, humFadeIn: 1.5, humFadeOut: 1, // the industrial hum, looping through both sky-view steps (device centred and sky)
+  deviceCursorSound: true, deviceCursorVolume: 0.3,
   lightSound: true, lightTrack: "v2", lightVolume: 0.6, lightDelay: 0, // the cue as the camera leaves the initial view for the targeted device: on, level, wait (s)
   // Sky step camera move (from the original Blender camera): turn about the vertical axis, tip up, time in / out, and where the projection hangs
   lookYaw: -135, lookPitch: 60, lookIn: 1, lookOut: 1, skyDistance: 60, skySize: 0.4,

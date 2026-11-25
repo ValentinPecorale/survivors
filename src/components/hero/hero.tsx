@@ -5,6 +5,7 @@ import RevealText from "../reveal-text"
 import Image from "next/image"
 import { unlockAudio, updateAmbient } from "./sound"
 import { SettingsPreset } from "./settings-preset"
+import { ContactForm } from "./contact-form"
 import { useHeldKey } from "./held-key"
 import { PropertiesPanel } from "./properties-panel"
 import { defaultAscii, defaultModel } from "./live-settings"
@@ -73,6 +74,7 @@ export function Hero() {
           {["Branding", "Websites", "Interior design", "AI Photo studios"].map(name => <RevealText as="li" key={name} text={name} />)}
         </ul>
       </div>
+      <ContactForm />
       <PropertiesPanel ascii={liveAscii} model={liveModel} onAscii={setAscii} onModel={setModel} status={gpu} />
     </section>
   )
