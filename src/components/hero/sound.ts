@@ -60,6 +60,29 @@ function output(c: AudioContext) {
   return bus
 }
 
+/**
+ * The hero's own sounds (music, footsteps, plant hover) pass through one extra gain so they can all be taken away together while the
+ * sky view is up. The searchlight cue goes straight to the main output and is not affected.
+ */
+let heroBus: GainNode | null = null
+function heroOutput(c: AudioContext) {
+  if (!heroBus) { heroBus = c.createGain(); heroBus.gain.value = heroMuted ? 0 : 1; heroBus.connect(output(c)) }
+  return heroBus
+}
+let heroMuted = false
+/** Fade the hero's sounds out (sky view) or back in. Cheap to call every frame: it only acts when the state changes. */
+export function setHeroAudioMuted(muted: boolean, fadeOut = 0.8, fadeIn = 1) {
+  if (muted === heroMuted) return
+  heroMuted = muted
+  const c = ctx
+  if (!c) return // nothing has played yet: the flag decides the level of the bus when it is created
+  const gain = heroOutput(c).gain
+  const now = c.currentTime
+  gain.cancelScheduledValues(now)
+  gain.setValueAtTime(gain.value, now)
+  gain.linearRampToValueAtTime(muted ? 0 : 1, now + (muted ? fadeOut : fadeIn))
+}
+
 let gated = false
 let gateTimer = 0
 /**
@@ -135,7 +158,7 @@ export function updateAmbient(enabled: boolean, volume: number, track: string) {
       const gain = c.createGain()
       source.buffer = buffer; source.loop = true
       gain.gain.value = 0.0001
-      source.connect(gain).connect(output(c))
+      source.connect(gain).connect(heroOutput(c))
       source.start()
       ambient = { id: def.url, source, gain }
       emit()
@@ -169,7 +192,7 @@ function startRun(c: AudioContext, buffer: AudioBuffer, pos: number, rate: numbe
   source.playbackRate.value = rate
   gain.gain.setValueAtTime(0.0001, c.currentTime)
   gain.gain.linearRampToValueAtTime(level, c.currentTime + 0.025)
-  source.connect(gain).connect(output(c))
+  source.connect(gain).connect(heroOutput(c))
   source.start(0, pos)
   run = { source, gain, pos, last: c.currentTime, rate }
 }
@@ -202,6 +225,102 @@ export function updateSteps(o: { enabled: boolean; playing: boolean; volume: num
   run.gain.gain.setTargetAtTime(level, now, 0.05)
 }
 
+// ─── Searchlight cue ───────────────────────────────────────────────────────
+/** One-shots played as the camera leaves the initial view for the targeted searchlight. `lift` evens out loudness between files (both peak near −9 dBFS; v1 is about 5 LU quieter overall). */
+export const LIGHT_CUES = {
+  camera: { label: "Camera to light", url: "/audio/camera-to-light.mp3", lift: 1.6 },
+  v1: { label: "Searchlight v1", url: "/audio/searchlight-v1.mp3", lift: 2.8 },
+  v2: { label: "Searchlight v2", url: "/audio/searchlight-v2.mp3", lift: 2.2 }, // about −30 LUFS, 3.1s
+} as const
+export type LightCueId = keyof typeof LIGHT_CUES
+const lightCueDef = (id: string) => LIGHT_CUES[id as LightCueId] ?? LIGHT_CUES.camera
+let lightCue: { source: AudioBufferSourceNode; gain: GainNode } | null = null
+
+export function preloadLightCue(id: string) { load(lightCueDef(id).url) }
+
+/** Fade out and drop the cue (the camera went back before it finished). */
+export function stopLightCue(fade = 0.3) {
+  const c = ctx, voice = lightCue
+  if (!c || !voice) return
+  lightCue = null
+  const now = c.currentTime
+  voice.gain.gain.cancelScheduledValues(now)
+  voice.gain.gain.setValueAtTime(voice.gain.gain.value, now)
+  voice.gain.gain.linearRampToValueAtTime(0, now + fade)
+  try { voice.source.stop(now + fade + 0.02) } catch {}
+}
+
+/** `volume` is the panel's 0–1 slider, squared like the other levels so the low end has room. */
+export function playLightCue(volume: number, id: string) {
+  const c = context()
+  if (!c || c.state !== "running" || volume <= 0) return
+  const def = lightCueDef(id)
+  const buffer = load(def.url)
+  if (!buffer) return
+  stopLightCue(0.05)
+  const source = c.createBufferSource()
+  source.buffer = buffer
+  const gain = c.createGain()
+  gain.gain.value = volume * volume * def.lift
+  source.connect(gain).connect(output(c))
+  source.onended = () => { if (lightCue?.source === source) lightCue = null }
+  source.start()
+  lightCue = { source, gain }
+}
+
+// ─── Searchlight loops ─────────────────────────────────────────────────────
+/**
+ * A looping bed with its own fades, straight to the main output (not part of the hero sounds that the sky view takes away).
+ * Each has its own level curve: the 0–1 slider is squared like the other sounds.
+ */
+function loopVoice(url: string, lift = 1) {
+  let voice: { source: AudioBufferSourceNode; gain: GainNode } | null = null
+  const level = (volume: number) => volume * volume * lift
+  return {
+    preload() { load(url) },
+    start(volume: number, fadeIn: number) {
+      const c = context()
+      if (!c || c.state !== "running" || volume <= 0 || voice) return
+      const buffer = load(url)
+      if (!buffer) return
+      const source = c.createBufferSource()
+      source.buffer = buffer
+      source.loop = true
+      const gain = c.createGain()
+      gain.gain.setValueAtTime(0.0001, c.currentTime)
+      gain.gain.linearRampToValueAtTime(level(volume), c.currentTime + Math.max(0.02, fadeIn))
+      source.connect(gain).connect(output(c))
+      source.start()
+      voice = { source, gain }
+    },
+    setVolume(volume: number) {
+      const c = ctx
+      if (!c || !voice) return
+      voice.gain.gain.cancelScheduledValues(c.currentTime)
+      voice.gain.gain.setTargetAtTime(level(volume), c.currentTime, 0.08)
+    },
+    stop(fadeOut: number) {
+      const c = ctx, current = voice
+      if (!c || !current) return
+      voice = null
+      const now = c.currentTime, seconds = Math.max(0.02, fadeOut)
+      current.gain.gain.cancelScheduledValues(now)
+      current.gain.gain.setValueAtTime(current.gain.gain.value, now)
+      current.gain.gain.linearRampToValueAtTime(0, now + seconds)
+      try { current.source.stop(now + seconds + 0.05) } catch {}
+    },
+  }
+}
+/** The Contact (sky step) loops, selectable in the panel: each supplied track with its last 0.4s cross-faded into its first (8.5s, seamless), about −20 LUFS. */
+export const CONTACT_TRACKS = {
+  loop: { label: "Contact loop", voice: loopVoice("/audio/contact-music.mp3") },
+  fast: { label: "Fast loop", voice: loopVoice("/audio/contact-music-fast.mp3") },
+} as const
+export type ContactTrackId = keyof typeof CONTACT_TRACKS
+export const contactVoice = (id: string) => (CONTACT_TRACKS[id as ContactTrackId] ?? CONTACT_TRACKS.loop).voice
+/** The industrial hum under the whole sky view (device step and sky step): 3.7s seamless loop, about −26 LUFS. */
+export const industrialHum = loopVoice("/audio/industrial-hum.mp3")
+
 // ─── Plant hover rustle ────────────────────────────────────────────────────
 let rustleNoise: AudioBuffer | null = null
 
@@ -228,7 +347,7 @@ export function playRustle(kind: keyof typeof RUSTLE, volume: number, pan: numbe
   const t = c.currentTime
   const out = c.createStereoPanner()
   out.pan.value = Math.max(-1, Math.min(1, pan))
-  out.connect(output(c))
+  out.connect(heroOutput(c))
   for (let i = 0; i < r.grains; i++) {
     const start = t + i * (r.length * 0.45) + Math.random() * 0.02
     const length = r.length * (0.7 + Math.random() * 0.6)
@@ -339,7 +458,7 @@ export function hoverMove(id: string, over: HoverKind | null, volume: number, pa
     const master = c.createGain()
     const panner = c.createStereoPanner()
     master.gain.value = 0.0001
-    master.connect(panner).connect(output(c))
+    master.connect(panner).connect(heroOutput(c))
     const voice: HoverVoice = { master, panner, nextAt: c.currentTime, lastMove: now, timer: 0, kind: over, buffer, avoid: def.avoid }
     // Keeps segments coming between pointer events, and releases once the pointer has been still.
     voice.timer = window.setInterval(() => {

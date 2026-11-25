@@ -240,7 +240,7 @@ export default function RevealText({
 
     if (trigger === "inView") {
       // Inside a stacked page card ("layer"): wait until the card has finished sliding in and fills the viewport,
-      // then start once the text itself is on screen. A card still sliding in from the right does not count.
+      // then start once the text itself is on screen. A card still sliding up from below does not count.
       const card = root.closest<HTMLElement>(".site-card");
       let cardIo: IntersectionObserver | undefined;
       let io: IntersectionObserver | undefined;

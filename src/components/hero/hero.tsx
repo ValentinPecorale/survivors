@@ -7,7 +7,6 @@ import { unlockAudio, updateAmbient } from "./sound"
 import { SettingsPreset } from "./settings-preset"
 import { useHeldKey } from "./held-key"
 import { PropertiesPanel } from "./properties-panel"
-import { SkySignal } from "./sky-signal"
 import { defaultAscii, defaultModel } from "./live-settings"
 import { useEffect, useState } from "react"
 
@@ -67,7 +66,6 @@ export function Hero() {
         {gpu === "yes" && <HeroScene ascii={sceneAscii} model={liveModel} onError={() => setGpu("no")} />}
       </div>
       {/* The signal lit on the sky while the camera looks up: crisp, above the ASCII scene (and its lighten blend), under the headline. */}
-      <SkySignal />
       {/* Figma 21:400 — headline bottom-left, services bottom-right; clicks fall through so cursor orbit still works. */}
       <div className="hero-overlay">
         <h1 className="hero-title">Creating stuff that<br />will survive.</h1>

@@ -10,7 +10,7 @@ import { loadGradientSettings } from "./gradient-settings"
 import { SoundToggle } from "./sound-toggle"
 import { SHORTCUT_KEYS, SOUND_KEY } from "./shortcuts"
 import { toggleAudio } from "./hero/sound"
-import { setSkyLook, toggleSkyLook, skyLooking, scrubSky } from "./hero/sky-look"
+import { setSkyLook, stepSkyView, toggleSkyLook, skyLooking, useSkyActive } from "./hero/sky-look"
 
 /** Scroll distance for one full slide, as a fraction of viewport height. 1:1 and linear. */
 const SCROLL_TRAVEL = 0.8
@@ -153,6 +153,7 @@ export function Navbar({ children }: { children: ReactNode }) {
   const live = cards.filter(c => !c.closing)
   const top = live[live.length - 1]
   const hasCards = live.length > 0
+  const skyActive = useSkyActive() // scroll up, Contact or Space: the sky view is up, so Contact is where you are (not Home)
 
 
   useEffect(() => {
@@ -230,15 +231,21 @@ export function Navbar({ children }: { children: ReactNode }) {
     // Side view is the start. Scrolling up on the bare hero scrubs straight to the sky, no extra steps.
     // The one exception: the swipe that brings the camera back from the zenith ends at the side view. Its remaining input (and the trackpad
     // momentum behind it) is swallowed until a new gesture begins: a pause of GESTURE_GAP_MS, a scroll the other way, or a flick harder than the tail before it.
-    const gesture = { last: 0, mag: 0, locked: false }
+    const gesture = { last: 0, mag: 0, locked: false, dir: -1 }
     const skyScroll = (pixels: number) => {
-      if (engine.snapshot().some(c => !c.closing) || scrollCamera.progress > 0.001) { gesture.locked = true; return false }
+      if (engine.snapshot().some(c => !c.closing) || scrollCamera.progress > 0.001) { gesture.locked = true; gesture.dir = -1; return false }
       if (gesture.locked) {
-        const newGesture = pixels > 0 || performance.now() - gesture.last > GESTURE_GAP_MS || Math.abs(pixels) > gesture.mag * 1.4 + 4
+        const newGesture = Math.sign(pixels) !== gesture.dir || performance.now() - gesture.last > GESTURE_GAP_MS || Math.abs(pixels) > gesture.mag * 1.4 + 4
         if (!newGesture) return true
         gesture.locked = false
       }
-      if (pixels < 0 || skyLooking()) { scrubSky(-pixels / travel()); return true }
+      // One scroll gesture is one step: up from the side view goes to the searchlight (centred, the forest stopped), up again to the sky,
+      // and down retraces both. The rest of that swipe (and its trackpad momentum) is swallowed until a new gesture begins.
+      if (pixels < 0 || skyLooking()) {
+        stepSkyView(pixels < 0 ? 1 : -1)
+        gesture.locked = true; gesture.dir = Math.sign(pixels)
+        return true
+      }
       return false
     }
     const stamp = (event: Event) => {
@@ -305,7 +312,7 @@ export function Navbar({ children }: { children: ReactNode }) {
         <nav aria-label="Primary">
           <ul>
             <li>
-              <Link href="/" scroll={false} aria-current={!hasCards ? "page" : undefined} aria-keyshortcuts={SHORTCUT_KEYS[0].toUpperCase()} onNavigate={event => { event.preventDefault(); setSkyLook(false); engine.closeAll() }}><span>Home</span><kbd aria-hidden="true">[{SHORTCUT_KEYS[0].toUpperCase()}]</kbd></Link>
+              <Link href="/" scroll={false} aria-current={!hasCards && !skyActive ? "page" : undefined} aria-keyshortcuts={SHORTCUT_KEYS[0].toUpperCase()} onNavigate={event => { event.preventDefault(); setSkyLook(false); engine.closeAll() }}><span>Home</span><kbd aria-hidden="true">[{SHORTCUT_KEYS[0].toUpperCase()}]</kbd></Link>
             </li>
             {navItems.map(s => (
               <li key={s.id}>
@@ -313,7 +320,7 @@ export function Navbar({ children }: { children: ReactNode }) {
               </li>
             ))}
             <li>
-              <button type="button" aria-keyshortcuts="Space" onClick={contact}><span>Contact</span><kbd aria-hidden="true">[SPACE]</kbd></button>
+              <button type="button" aria-keyshortcuts="Space" aria-current={skyActive ? "page" : undefined} onClick={contact}><span>Contact</span><kbd aria-hidden="true">[SPACE]</kbd></button>
             </li>
             <li><SoundToggle /></li>
           </ul>
