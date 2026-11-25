@@ -274,7 +274,8 @@ export function playLightCue(volume: number, id: string) {
  * Each has its own level curve: the 0–1 slider is squared like the other sounds.
  */
 function loopVoice(url: string, lift = 1) {
-  let voice: { source: AudioBufferSourceNode; gain: GainNode } | null = null
+  let voice: { source: AudioBufferSourceNode; gain: GainNode; mix: GainNode } | null = null
+  let mixLevel = 1
   const level = (volume: number) => volume * volume * lift
   return {
     preload() { load(url) },
@@ -289,9 +290,20 @@ function loopVoice(url: string, lift = 1) {
       const gain = c.createGain()
       gain.gain.setValueAtTime(0.0001, c.currentTime)
       gain.gain.linearRampToValueAtTime(level(volume), c.currentTime + Math.max(0.02, fadeIn))
-      source.connect(gain).connect(output(c))
+      const mix = c.createGain()
+      mix.gain.value = mixLevel
+      source.connect(gain).connect(mix).connect(output(c))
       source.start()
-      voice = { source, gain }
+      voice = { source, gain, mix }
+    },
+    /** Independent scene attenuation preserves the volume slider and start/stop fades. */
+    setMix(value: number, seconds = 0.6) {
+      if (value === mixLevel) return
+      mixLevel = value
+      if (!ctx || !voice) return
+      const param = voice.mix.gain, now = ctx.currentTime
+      param.cancelAndHoldAtTime(now)
+      param.linearRampToValueAtTime(value, now + seconds)
     },
     setVolume(volume: number) {
       const c = ctx
@@ -320,6 +332,8 @@ export type ContactTrackId = keyof typeof CONTACT_TRACKS
 export const contactVoice = (id: string) => (CONTACT_TRACKS[id as ContactTrackId] ?? CONTACT_TRACKS.loop).voice
 /** The industrial hum under the whole sky view (device step and sky step): 3.7s seamless loop, about −26 LUFS. */
 export const industrialHum = loopVoice("/audio/industrial-hum.mp3")
+/** Cursor-controlled electrical texture, independent of the hero mute but behind the global speaker gate. */
+export const deviceCursorVoice = loopVoice("/audio/device-cursor.mp3")
 
 // ─── Plant hover rustle ────────────────────────────────────────────────────
 let rustleNoise: AudioBuffer | null = null

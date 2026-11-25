@@ -426,6 +426,8 @@ export function PropertiesPanel({ ascii, model, onAscii, onModel, status }: Prop
             {mr("Footsteps volume", "stepVolume", 0, 1)}
             {mr("Footsteps sync · seconds", "stepOffset", -0.2, 0.2, 0.01)}
             <Toggle label="Industrial hum" value={model.humSound} onChange={v => { if (v) unlockAudio(); m("humSound", v) }} />
+            <Toggle label="Device cursor sound" value={model.deviceCursorSound} onChange={v => { if (v) unlockAudio(); m("deviceCursorSound", v) }} />
+            <Range label="Device cursor volume" value={model.deviceCursorVolume} min={0} max={1} step={0.01} onChange={v => m("deviceCursorVolume", v)} />
             {mr("Industrial hum volume", "humVolume", 0, 1)}
             {mr("Industrial hum delay · seconds", "humDelay", 0, 10, 0.1)}
             {mr("Industrial hum fade in · seconds", "humFadeIn", 0, 6, 0.1)}

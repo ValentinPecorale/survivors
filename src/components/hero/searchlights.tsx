@@ -6,15 +6,16 @@ import { useAnimations, useGLTF } from "@react-three/drei"
 import { useFrame, useThree } from "@react-three/fiber"
 import { useEffect, useMemo } from "react"
 import * as THREE from "three"
-import { abs, dot, float, floor, fract, max, screenCoordinate, sin, step, texture as tslTexture, uniform, uv, vec2, vec4 } from "three/tsl"
+import { abs, dot, float, floor, fract, length, max, positionWorld, screenCoordinate, sin, smoothstep, step, texture as tslTexture, uniform, uv, vec2, vec4 } from "three/tsl"
 import { MeshBasicNodeMaterial } from "three/webgpu"
 import { useGradientSettings } from "../gradient-settings"
 import { lightTarget } from "./light-target"
 import { releaseSkyLook, skyLook } from "./sky-look"
-import { CONTACT_TRACKS, contactVoice, industrialHum, playLightCue, preloadLightCue, setHeroAudioMuted, stopLightCue, unlockAudio } from "./sound"
+import { CONTACT_TRACKS, contactVoice, deviceCursorVoice, industrialHum, playLightCue, preloadLightCue, setHeroAudioMuted, stopLightCue, unlockAudio } from "./sound"
 import { useChromeMaterial } from "./tiger-surface"
 import { deviceReveal, useDeviceTransition } from "./device-transition"
 import { getProjectionTexture, PROJECTION_ASPECT } from "./projection-image"
+import { setContactFormVisible } from "./contact-state"
 
 import type { ModelSettings } from "./live-settings"
 
@@ -61,8 +62,33 @@ export function Searchlights({ clipTime, settings }: { clipTime: () => number; s
   const { dotsColumns, dotsSize } = useGradientSettings()
   const chrome = useChromeMaterial({ ...settings, tigerColor: "#ffffff", tigerRoughness: 0.04, tigerMetalness: 1, tigerReflection: 1, tigerStudioRotation: 0, tigerWireframe: false })
   const transition = useDeviceTransition(chrome)
+  // A soft floor oval on the ASCII layer, so the postprocess turns its gradient into glyphs.
+  const groundShadow = useMemo(() => {
+    const size = 128, pixels = new Uint8Array(size * size * 4)
+    for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) {
+      const r = Math.hypot((x + 0.5) / size * 2 - 1, (y + 0.5) / size * 2 - 1)
+      const feather = 1 - THREE.MathUtils.smoothstep(r, 0.3, 1)
+      const i = (y * size + x) * 4
+      pixels[i] = pixels[i + 1] = pixels[i + 2] = 255
+      pixels[i + 3] = Math.round(255 * feather)
+    }
+    const texture = new THREE.DataTexture(pixels, size, size)
+    texture.magFilter = texture.minFilter = THREE.LinearFilter
+    texture.needsUpdate = true
+    const material = new MeshBasicNodeMaterial({ map: texture, transparent: true, opacity: 0.12, depthWrite: false, toneMapped: false, side: THREE.DoubleSide })
+    const mesh = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), material)
+    mesh.rotation.x = -Math.PI / 2
+    mesh.layers.set(0)
+    mesh.visible = false
+    return mesh
+  }, [])
+  useEffect(() => () => {
+    groundShadow.geometry.dispose()
+    groundShadow.material.map?.dispose()
+    groundShadow.material.dispose()
+  }, [groundShadow])
   const reducedMotion = useMemo(() => typeof window !== "undefined" ? window.matchMedia("(prefers-reduced-motion: reduce)") : null, [])
-  const grid = useMemo(() => ({ pitch: uniform(6), size: uniform(2), density: uniform(1.4), color: uniform(new THREE.Color()) }), [])
+  const grid = useMemo(() => ({ pitch: uniform(6), size: uniform(2), density: uniform(1.4), color: uniform(new THREE.Color()), lamp: uniform(new THREE.Vector3()), reach: uniform(1) }), [])
 
   useEffect(() => {
     // Spacing 0 = the site's own grid (cards, footer); anything else is a pitch in whole px. Dot size 0 = the site's dot size.
@@ -87,7 +113,10 @@ export function Searchlights({ clipTime, settings }: { clipTime: () => number; s
       const inDot = step(max(offset.x, offset.y), grid.size.mul(0.5))
       const random = fract(sin(dot(cell, vec2(12.9898, 78.233))).mul(43758.5453))
       // The authored gradient lives in the texture's alpha; the density multiplier decides how far the dotted core reaches.
-      const shape = (source.map ? tslTexture(source.map, uv()).a : float(1)).mul(grid.density)
+      // Preserve full density near the lamp; thin the dots progressively over 1–12 device widths.
+      const distance = length(positionWorld.sub(grid.lamp)).div(grid.reach)
+      const falloff = float(1).sub(smoothstep(float(1), float(12), distance)).mul(0.85).add(0.15)
+      const shape = (source.map ? tslTexture(source.map, uv()).a : float(1)).mul(grid.density).mul(falloff)
       const material = new MeshBasicNodeMaterial()
       material.colorNode = vec4(grid.color, 1)
       material.opacityNode = inDot.mul(step(random, shape))
@@ -115,21 +144,50 @@ export function Searchlights({ clipTime, settings }: { clipTime: () => number; s
   useEffect(() => { contactVoice(settings.contactTrack).setVolume(settings.contactMusicVolume) }, [settings.contactMusicVolume, settings.contactTrack])
   useEffect(() => { if (settings.humSound) industrialHum.preload(); else industrialHum.stop(0.5) }, [settings.humSound])
   useEffect(() => { industrialHum.setVolume(settings.humVolume) }, [settings.humVolume])
+  useEffect(() => {
+    if (!settings.deviceCursorSound) { deviceCursorVoice.stop(0.12); return }
+    deviceCursorVoice.preload()
+    const canvas = document.querySelector(".sky-contact")?.parentElement?.querySelector("canvas")
+    if (!canvas) return
+    let last: { x: number; y: number; time: number } | null = null
+    let timer = 0
+    const stop = () => { last = null; window.clearTimeout(timer); deviceCursorVoice.stop(0.12) }
+    const move = (event: PointerEvent) => {
+      if (event.pointerType !== "mouse" || skyLook.want !== 1 || skyLook.progress < SKY_ARRIVE || !lightTarget.active || !settings.searchlights || !settings.searchlightSkyFocus) { stop(); return }
+      const now = performance.now()
+      if (last) {
+        const speed = Math.hypot(event.clientX - last.x, event.clientY - last.y) / Math.max(8, now - last.time) * 1000
+        const volume = settings.deviceCursorVolume * Math.min(1, speed / 900)
+        if (volume > 0.005) { deviceCursorVoice.start(volume, 0.06); deviceCursorVoice.setVolume(volume) }
+      }
+      last = { x: event.clientX, y: event.clientY, time: now }
+      window.clearTimeout(timer)
+      timer = window.setTimeout(stop, 140)
+    }
+    canvas.addEventListener("pointermove", move)
+    canvas.addEventListener("pointerleave", stop)
+    window.addEventListener("blur", stop)
+    return () => { canvas.removeEventListener("pointermove", move); canvas.removeEventListener("pointerleave", stop); window.removeEventListener("blur", stop); stop() }
+  }, [settings.deviceCursorSound, settings.deviceCursorVolume, settings.searchlights, settings.searchlightSkyFocus])
   // The projection: a camera-facing plane on layer 0, so it goes through the same ASCII pass as the forest (glyphs, not pixels).
   const projection = useMemo(() => {
     const material = new MeshBasicNodeMaterial({ color: "#ffffff", transparent: false, alphaTest: 0.5, fog: false, toneMapped: false, depthTest: false, side: THREE.DoubleSide })
+    const cell = floor(screenCoordinate.div(grid.pitch))
+    const offset = abs(screenCoordinate.sub(cell.mul(grid.pitch)).sub(grid.pitch.mul(0.5)))
+    material.opacityNode = step(max(offset.x, offset.y), grid.size.mul(0.5)).mul(tslTexture(getProjectionTexture(), uv()).a)
     const mesh = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), material)
+    mesh.layers.set(1)
     mesh.visible = false; mesh.frustumCulled = false; mesh.scale.set(1, PROJECTION_ASPECT, 1)
     return mesh
-  }, [])
+  }, [grid])
   useEffect(() => {
     ;(projection.material as MeshBasicNodeMaterial).map = getProjectionTexture()
     scene.add(projection)
-    return () => { scene.remove(projection); (projection.material as THREE.Material).dispose(); projection.geometry.dispose() }
+    return () => { setContactFormVisible(false); scene.remove(projection); (projection.material as THREE.Material).dispose(); projection.geometry.dispose() }
   }, [scene, projection])
 
   const lights = useMemo(() => scene.children.filter(child => child.name.startsWith("Searchlight_")), [scene])
-  const track = useMemo(() => ({ light: null as THREE.Object3D | null, box: new THREE.Box3(), center: new THREE.Vector3(), last: new THREE.Vector3(), shift: new THREE.Vector3(), fresh: true, wasUp: false, lit: 0, lamp: "off" as "off" | "in" | "out", scale: new THREE.Vector3(), right: new THREE.Vector3(), exit: 0, cue: 0, music: 0, skyMusic: false, hum: false, humTimer: 0, quat: new THREE.Quaternion() }), [])
+  const track = useMemo(() => ({ light: null as THREE.Object3D | null, box: new THREE.Box3(), center: new THREE.Vector3(), last: new THREE.Vector3(), shift: new THREE.Vector3(), fresh: true, wasUp: false, lit: 0, skyHold: 0, lamp: "off" as "off" | "in" | "out", scale: new THREE.Vector3(), right: new THREE.Vector3(), exit: 0, cue: 0, music: 0, skyMusic: false, hum: false, humTimer: 0, quat: new THREE.Quaternion() }), [])
 
   // Picking another Contact track while the sky step is playing swaps it over.
   useEffect(() => {
@@ -141,6 +199,7 @@ export function Searchlights({ clipTime, settings }: { clipTime: () => number; s
 
   // Priority 0.4: after the forest clock moved (0) and before the camera reads the target (0.5).
   useFrame(({ camera, pointer }, delta) => {
+    if (skyLook.want !== 1) deviceCursorVoice.stop(0.12)
     scene.visible = settings.searchlights
     if (!clip) return
     clip.time = clipTime()
@@ -187,6 +246,8 @@ export function Searchlights({ clipTime, settings }: { clipTime: () => number; s
       else contactVoice(settings.contactTrack).stop(skyLook.skip ? 0.3 : settings.contactMusicFadeOut)
     }
     // The industrial hum runs under both steps (device centred, then sky) and goes as soon as you step back out of the first.
+    // Let the sky music lead: -8 dB (40% gain), with a 0.6s linear fade in either direction.
+    industrialHum.setMix(follow && skyLook.want === 2 && lightTarget.look > 0.001 ? 0.4 : 1)
     const humActive = settings.humSound && follow && skyLook.want >= 1
     if (humActive !== track.hum) {
       track.hum = humActive
@@ -221,12 +282,20 @@ export function Searchlights({ clipTime, settings }: { clipTime: () => number; s
     const retrace = skyLook.want === 0 && !skyLook.skip && track.lamp === "off" && lightTarget.look <= 0.001
     transition.update(device3d instanceof THREE.Mesh ? device3d : null, delta, pointer, reduced, retrace)
     for (const light of lights) for (const child of light.children) if (child.name.startsWith("SearchlightBeam")) child.visible = light === track.light && on
-    projection.visible = !!track.light && on
+    // Hold the skull for 2s after the sky move, then switch to the form through two flicks.
+    const skySettled = skyLook.want === 2 && lightTarget.look >= 0.999 && !skyLook.skip
+    track.skyHold = skySettled ? track.skyHold + dt : 0
+    const formVisible = track.skyHold >= (reduced ? 2 : 2.36)
+    setContactFormVisible(formVisible)
+    const swapDark = track.skyHold >= 2 && track.skyHold < 2.36 && ((track.skyHold - 2) % 0.18 < 0.07)
+    projection.visible = !!track.light && on && !formVisible && !swapDark
     if (track.light) {
-      // Hung along the direction the sky step ends up looking, so the finished camera move frames it dead centre, upright and facing the lens.
+      // Use the centre ray of the shifted lens, rotated into the final sky pose. The optical axis alone
+      // is off-centre when the device framing uses setViewOffset; leave the camera and its target untouched.
       const height = 2 * settings.skyDistance * Math.tan(THREE.MathUtils.degToRad((camera as THREE.PerspectiveCamera).fov) / 2) * settings.skySize
       const width = height / PROJECTION_ASPECT
-      track.center.copy(camera.position).addScaledVector(lightTarget.skyDir, settings.skyDistance)
+      track.center.set(0, 0, 0.5).applyMatrix4(camera.projectionMatrixInverse).normalize().applyQuaternion(lightTarget.skyQuat)
+      track.center.multiplyScalar(settings.skyDistance).add(camera.position)
       scene.getWorldScale(track.scale)
       projection.position.copy(scene.worldToLocal(track.center))
       projection.scale.set(width / track.scale.x, height / track.scale.y, 1)
@@ -241,8 +310,16 @@ export function Searchlights({ clipTime, settings }: { clipTime: () => number; s
       track.exit = done ? track.exit + dt : 0
       if (track.exit >= EXIT_BEAT || !track.light || !follow) { track.exit = 0; releaseSkyLook() }
     } else track.exit = 0
+    groundShadow.visible = !!track.light && follow && skyLook.progress > 0.01
     if (!track.light) return
     track.box.setFromObject(device(track.light)).getCenter(track.center)
+    const deviceWidth = Math.max(track.box.max.x - track.box.min.x, track.box.max.z - track.box.min.z)
+    grid.lamp.value.copy(track.center)
+    grid.reach.value = Math.max(deviceWidth, 0.001)
+    groundShadow.position.set(track.center.x, track.box.min.y, track.center.z)
+    groundShadow.parent?.worldToLocal(groundShadow.position)
+    groundShadow.scale.set(deviceWidth * 1.7, deviceWidth * 1.25, 1)
+    groundShadow.material.opacity = 0.12 * skyLook.progress
     // The lights ride a looping treadmill: when the clip wraps, the light snaps back one loop. Carry that jump so the target keeps travelling.
     if (!track.fresh && track.center.distanceToSquared(track.last) > 400) track.shift.add(track.last).sub(track.center)
     track.fresh = false
@@ -251,7 +328,7 @@ export function Searchlights({ clipTime, settings }: { clipTime: () => number; s
     lightTarget.active = true
   }, 0.4)
 
-  return <primitive object={scene} />
+  return <><primitive object={scene} /><primitive object={groundShadow} /></>
 }
 
 
