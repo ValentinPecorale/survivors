@@ -10,6 +10,13 @@ import { TigerSurface, ChromeKeyLight } from "./tiger-surface"
 import referenceFrame from "./tiger-framing.json"
 import type { TigerFrame } from "./camera-framing"
 import type { ModelSettings } from "./live-settings"
+import { skyLook } from "./sky-look"
+import { runState } from "./run-state"
+
+/** How far behind its place the tiger re-enters from, in world units, once the sky view is left: beyond the frame edge. */
+const REENTRY_DISTANCE = 16
+/** Past this the tiger is out of the shot, so it may be moved behind the camera frame without a visible pop. */
+const OFFSCREEN_DISTANCE = 9
 
 const TIGER_URL = "/models/tiger.glb?v=landing-20261110"
 useGLTF.preload(TIGER_URL)
@@ -19,6 +26,7 @@ export function Tiger({ settings, orbitTarget, subjectFrame }: { settings: Model
   const { scene, animations } = useGLTF(TIGER_URL)
   const { actions, mixer } = useAnimations(animations, scene)
   const group = useRef<THREE.Group>(null)
+  const run = useRef<THREE.Group>(null)
   const framing = useMemo(() => {
     const center = new THREE.Vector3().fromArray(referenceFrame.center)
     const low = new THREE.Vector3().fromArray(referenceFrame.min)
@@ -57,6 +65,21 @@ export function Tiger({ settings, orbitTarget, subjectFrame }: { settings: Model
     scene.traverse(object => { object.layers.set(1) })
   }, [scene])
 
+  // Sky view: the ground has stopped, so the tiger itself carries the speed the ground had and runs out of the frame along its own
+  // forward axis (-Z in the tiger's space, against the way the forest scrolls). The framing target above never sees this: it reads
+  // the outer group, and only this inner one moves. Leaving the view, it re-enters from behind, running forward the whole time.
+  useFrame((_, delta) => {
+    const dt = Math.min(delta, 0.1)
+    const away = skyLook.target > 0
+    if (away) runState.travel += runState.groundSpeed * settings.speed * skyLook.progress * dt
+    else if (runState.travel > OFFSCREEN_DISTANCE) runState.travel = -REENTRY_DISTANCE
+    else runState.travel -= runState.travel * (1 - Math.exp(-dt / 0.6))
+    if (Math.abs(runState.travel) < 0.001) runState.travel = 0
+    // While it is away from the shot and coming back, keep its gait in step with the forest it is rejoining.
+    if (!away && runState.travel !== 0 && clip) clip.time = runState.forestTime
+    if (run.current) run.current.position.z = -runState.travel / Math.max(settings.tigerScale, 0.001)
+  }, 0.45)
+
   useEffect(() => {
     clip?.reset().play()
     return () => { clip?.stop() }
@@ -79,7 +102,7 @@ export function Tiger({ settings, orbitTarget, subjectFrame }: { settings: Model
     {settings.tigerMaterial === "chrome" && <ChromeKeyLight />}
     <Suspense fallback={null}><TigerSurface scene={scene} settings={settings} /></Suspense>
     <group ref={group} visible={settings.tigerVisible} position={[settings.tigerX, settings.tigerY, settings.tigerZ]} scale={settings.tigerScale} rotation={[0, THREE.MathUtils.degToRad(settings.tigerRotation), 0]}>
-    <primitive object={scene} />
+    <group ref={run}><primitive object={scene} /></group>
     </group>
   </>
 }

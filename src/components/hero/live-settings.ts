@@ -24,6 +24,20 @@ export const defaultText = {
   textAsciiColumns: 40, textAsciiEndColumns: 140, textAsciiBlackPoint: 0, textAsciiWhitePoint: 0.93,
 }
 
+export const defaultSearchlights = {
+  searchlights: true, searchlightColor: "#f5f5f0",
+  searchlightDotSize: 0, searchlightSpacing: 0, searchlightDensity: 0.7,
+  lampFlicker: true, lampFlickerEvery: 10, lampFlickerCount: 2, // while the lamp is on, the failing-bulb effect repeats: every N seconds, this many dark flicks
+  contactMusic: true, contactTrack: "loop", contactMusicVolume: 0.5, contactMusicDelay: 0, contactMusicFadeIn: 1.5, contactMusicFadeOut: 1, // loops for as long as the Contact (sky) view is up
+  humSound: true, humVolume: 0.5, humDelay: 0, humFadeIn: 1.5, humFadeOut: 1, // the industrial hum, looping through both sky-view steps (device centred and sky)
+  lightSound: true, lightTrack: "v2", lightVolume: 0.6, lightDelay: 0, // the cue as the camera leaves the initial view for the targeted device: on, level, wait (s)
+  // Sky step camera move (from the original Blender camera): turn about the vertical axis, tip up, time in / out, and where the projection hangs
+  lookYaw: -135, lookPitch: 60, lookIn: 1, lookOut: 1, skyDistance: 60, skySize: 0.4,
+  searchlightSkyFocus: true, searchlightZoom: 1.5, searchlightChrome: true,
+  plantsShrink: true, shrinkDuration: 0.5, shrinkSpread: 0.8, shrinkOrder: "nearest", shrinkReturn: 1, shrinkDustFade: 0.35,
+  shrinkEaseX1: 0, shrinkEaseY1: 0, shrinkEaseX2: 1, shrinkEaseY2: 1, shrinkSoftness: 1, shrinkOverlap: 2,
+}
+
 export const defaultModel = {
   tigerMaterial: "chrome", tigerColor: "#ffffff", tigerRoughness: 0.04, tigerMetalness: 1, tigerWireframe: false, tigerReflection: 1, tigerStudioRotation: 0,
   tigerVisible: true, tigerScale: 1, tigerX: 0, tigerY: 0, tigerZ: 0, tigerRotation: 0,
@@ -39,6 +53,7 @@ export const defaultModel = {
   keyColor: "#ffffff", rimLight: 0, rimColor: "#ffcb00",
   ...defaultCamera,
   ...defaultText,
+  ...defaultSearchlights,
 }
 
 export type AsciiSettings = typeof defaultAscii

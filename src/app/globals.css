@@ -169,9 +169,9 @@ body {
   background: #0a0a0a;
   color: var(--foreground);
   font-family: var(--font-geist-sans), sans-serif;
-  border-left: 1px solid #ffffff1a;
-  /* Off-screen right until card-engine.ts takes over the transform. */
-  transform: translateX(100%);
+  border-top: 1px solid #ffffff1a;
+  /* Off-screen below until card-engine.ts takes over the transform. */
+  transform: translateY(100%);
   will-change: transform;
 }
 .site-card[data-closing="true"] { pointer-events: none; }
@@ -390,7 +390,7 @@ a.logo-link:focus-visible { outline: 1px solid #8e8e8e; outline-offset: 8px; }
 /* Cards on top (they take the height that is left), the title and its paragraph under them: 6 columns each (the type and grid come from .about-who-text). */
 .featured-text { flex: none; padding-top: 0; align-items: end; } /* the title sits on the last line of the paragraph, like the texts under the videos */
 .about-who-text.featured-text .who-title { grid-column: 1 / span 6; }
-.about-who-text.featured-text .who-intro { grid-column: 7 / span 6; }
+.about-who-text.featured-text .who-intro { grid-column: 7 / span 6; visibility: hidden; } /* paragraph hidden for now, but still laid out so the block (and the cards' height) stays the same; the copy lives in about.json (projectsText) */
 .featured-main { flex: 1 1 0; min-height: 0; display: flex; flex-direction: column; gap: 24px; }
 /* Figma 265:772: the heading (H3: Geist SemiBold 26px, white), 24px above the two cards, 24px between the cards. The cards fill the height that is left: the pictures grow and shrink with the screen. */
 /* Two fixed slots under the title. Each holds a stack of cards; later cards sit over earlier ones (z-index = project number) and rise into place from below. */
@@ -580,6 +580,6 @@ a.logo-link:focus-visible { outline: 1px solid #8e8e8e; outline-offset: 8px; }
 .site-footer[data-dots="off"] :is(.footer-link-dots, .footer-link-fill) { background-image: none; }
 @media (max-width: 700px) { .footer-link-layout { flex: none; height: auto; } }
 
-/* The sky signal (hero/sky-signal.tsx): centred, wide, never catches the pointer. Opacity and transform are written per frame. */
-.sky-signal { position: absolute; left: 50%; top: 50%; width: min(78vw, 1400px); pointer-events: none; mix-blend-mode: screen; will-change: transform, opacity; }
-.sky-signal svg { display: block; overflow: visible; }
+
+
+

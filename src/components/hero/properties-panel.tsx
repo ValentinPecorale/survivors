@@ -1,12 +1,12 @@
 "use client"
 
 import about from "@/content/sections/about.json"
-import { HOVER_SOUNDS, TRACKS, unlockAudio } from "./sound"
+import { CONTACT_TRACKS, HOVER_SOUNDS, LIGHT_CUES, TRACKS, unlockAudio } from "./sound"
 import { Fragment, useId, useState, type CSSProperties, type ReactNode } from "react"
 import { saveDefaultSettings } from "./settings-preset"
 import { defaultFooterLayout, defaultFooterModels, defaultGradientSettings, getGradientSettings, saveGradientSettings, setGradientSettings, useGradientSettings, type GradientSettings } from "../gradient-settings"
 import { bezierEase, defaultCardSettings, easePresets, saveCardSettings, setCardSettings, useCardSettings, type Bezier, type CardSettings } from "../card-settings"
-import { defaultAscii, defaultModel, defaultCamera, defaultText, type AsciiSettings, type ModelSettings } from "./live-settings"
+import { defaultAscii, defaultModel, defaultCamera, defaultText, defaultSearchlights, type AsciiSettings, type ModelSettings } from "./live-settings"
 
 type Props = {
   ascii: AsciiSettings
@@ -122,6 +122,12 @@ const TABS: readonly { id: TabId; label: string; sections: readonly { title: str
           "camera/Cursor movement",
           "camera/Landing motion",
           "camera/Camera"
+        ]
+      },
+      {
+        "title": "Searchlights",
+        "keys": [
+          "searchlights/Searchlights"
         ]
       },
       {
@@ -419,6 +425,21 @@ export function PropertiesPanel({ ascii, model, onAscii, onModel, status }: Prop
             <Toggle label="Tiger footsteps" value={model.stepSound} onChange={v => { if (v) unlockAudio(); m("stepSound", v) }} />
             {mr("Footsteps volume", "stepVolume", 0, 1)}
             {mr("Footsteps sync · seconds", "stepOffset", -0.2, 0.2, 0.01)}
+            <Toggle label="Industrial hum" value={model.humSound} onChange={v => { if (v) unlockAudio(); m("humSound", v) }} />
+            {mr("Industrial hum volume", "humVolume", 0, 1)}
+            {mr("Industrial hum delay · seconds", "humDelay", 0, 10, 0.1)}
+            {mr("Industrial hum fade in · seconds", "humFadeIn", 0, 6, 0.1)}
+            {mr("Industrial hum fade out · seconds", "humFadeOut", 0, 6, 0.1)}
+            <Toggle label="Contact music" value={model.contactMusic} onChange={v => { if (v) unlockAudio(); m("contactMusic", v) }} />
+            <Select label="Contact music" value={model.contactTrack} options={Object.entries(CONTACT_TRACKS).map(([id, t]) => [id, t.label] as [string, string])} onChange={v => m("contactTrack", v)} />
+            {mr("Contact music volume", "contactMusicVolume", 0, 1)}
+            {mr("Contact music delay · seconds", "contactMusicDelay", 0, 10, 0.1)}
+            {mr("Contact music fade in · seconds", "contactMusicFadeIn", 0, 6, 0.1)}
+            {mr("Contact music fade out · seconds", "contactMusicFadeOut", 0, 6, 0.1)}
+            <Toggle label="Searchlight cue" value={model.lightSound} onChange={v => { if (v) unlockAudio(); m("lightSound", v) }} />
+            <Select label="Searchlight sound" value={model.lightTrack} options={Object.entries(LIGHT_CUES).map(([id, c]) => [id, c.label] as [string, string])} onChange={v => m("lightTrack", v)} />
+            {mr("Searchlight cue volume", "lightVolume", 0, 1)}
+            {mr("Searchlight cue delay · seconds", "lightDelay", 0, 1, 0.01)}
             <p className="property-help">Music loops across all pages after the first click or keypress. The navbar speaker pauses/resumes all audio. The hover sound plays only while the cursor is moving over a tree, plant or grass head (exact silhouette, not a box) and follows cursor speed; hold still and it stops. Footsteps are retimed to the stride, so they follow Speed, Play and Seek (silent in ping-pong). Nudge sync if the thuds land early or late against the paws. Use Save as default to keep your levels.</p>
           </Group>
     ),
@@ -733,6 +754,39 @@ export function PropertiesPanel({ ascii, model, onAscii, onModel, status }: Prop
             <p className="property-help">Uses the camera keys in the re-exported GLBs. 1× is the authored movement; pause, seek and speed stay synchronized with the run.</p>
           </Group>
     ),
+    "searchlights/Searchlights": () => (
+          <Group title="Searchlights">
+            <Toggle label="Show searchlights" value={model.searchlights} onChange={v => m("searchlights", v)} />
+            <Color label="Dot color" value={model.searchlightColor} onChange={v => m("searchlightColor", v)} />
+            {mr("Dot size · px (0 = site grid)", "searchlightDotSize", 0, 6, 1)}
+            {mr("Spacing · px (0 = site grid)", "searchlightSpacing", 0, 16, 1)}
+            {mr("Beam density", "searchlightDensity", 0.4, 3, 0.05)}
+            <Toggle label="Beam flickers now and then" value={model.lampFlicker} onChange={v => m("lampFlicker", v)} />
+            {mr("Flicker every · seconds", "lampFlickerEvery", 2, 30, 0.5)}
+            {mr("Flicks per burst", "lampFlickerCount", 1, 5, 1)}
+            <Toggle label="Targeted device in chrome" value={model.searchlightChrome} onChange={v => m("searchlightChrome", v)} />
+            {mr("Sky view zoom ×", "searchlightZoom", 1, 4, 0.05)}
+            {mr("Camera turn · degrees", "lookYaw", -270, 270, 1)}
+            {mr("Camera tilt up · degrees", "lookPitch", -30, 60, 0.1)}
+            {mr("Camera move in · seconds", "lookIn", 0.3, 6, 0.1)}
+            {mr("Camera move out · seconds", "lookOut", 0.3, 6, 0.1)}
+            {mr("Projection distance", "skyDistance", 15, 200, 1)}
+            {mr("Projection size · viewport height", "skySize", 0.1, 0.9, 0.01)}
+            <Toggle label="Sky view looks at a searchlight" value={model.searchlightSkyFocus} onChange={v => m("searchlightSkyFocus", v)} />
+            <Toggle label="Plants and trees shrink away" value={model.plantsShrink} onChange={v => m("plantsShrink", v)} />
+            {mr("Shrink duration · seconds", "shrinkDuration", 0.3, 4, 0.1)}
+            {mr("Shrink spread · seconds", "shrinkSpread", 0, 2, 0.05)}
+            <Select label="Order" value={model.shrinkOrder} options={[["nearest", "Nearest the light first"], ["farthest", "Farthest first"], ["random", "Random"], ["together", "All together"]]} onChange={v => m("shrinkOrder", v)} />
+            <EaseEditor label="Plant ease" value={[model.shrinkEaseX1, model.shrinkEaseY1, model.shrinkEaseX2, model.shrinkEaseY2]}
+              onChange={v => onModel({ ...model, shrinkEaseX1: v[0], shrinkEaseY1: v[1], shrinkEaseX2: v[2], shrinkEaseY2: v[3] })} />
+            {mr("Slice softness", "shrinkSoftness", 0, 1, 0.05)}
+            {mr("Slice overlap", "shrinkOverlap", 0.5, 4, 0.05)}
+            {mr("Return speed ×", "shrinkReturn", 0.25, 3, 0.05)}
+            {mr("Step dust fade · seconds", "shrinkDustFade", 0.05, 2, 0.05)}
+            <p className="property-help">While the camera looks at a searchlight, every plant and tree collapses from the top down, segment by segment. Duration is how long one plant takes; spread is the extra time between the first plant and the last, ordered by the setting above. Plant ease shapes the whole shrink of each plant; slice softness is how eased each segment is within it (0 is linear, 1 is smoothstep); overlap is how many segment-steps each slice takes, so low values make a staccato ripple and high values a smooth wave. Return speed scales the grow-back when you leave. The dust kicked up by the tiger&apos;s steps fades out over the dust fade time at the start, and back in at the end.</p>
+            <p className="property-help">The beams and glows are built from dots, with no light. At 0, dot size and spacing follow the Featured cards and footer grid. Density is how far the dotted core reaches along the beam: lower thins it out, higher fills it. With the sky view on, the camera stops following the tiger and centers the nearest searchlight device while the forest stops and the tiger runs out of frame; off, it only tilts up to the sky.</p>
+          </Group>
+    ),
     "camera/Camera": () => (
           <Group title="Camera">
             <p className="property-help">Stable framing keeps the run centered without following individual limbs. The camera combines cursor orbit with the authored landing dip; the resting angle stays level. Portrait screens fit the full loop.</p>
@@ -840,7 +894,7 @@ export function PropertiesPanel({ ascii, model, onAscii, onModel, status }: Prop
 
   // Reset puts back the defaults of what the open tab shows: the hero's effect, model, camera and floor text together; for the other tabs, only the gradient-store settings of its groups.
   const reset = () => {
-    if (tab === "hero") { onAscii({ ...defaultAscii }); onModel({ ...defaultModel, ...defaultCamera, ...defaultText }); return }
+    if (tab === "hero") { onAscii({ ...defaultAscii }); onModel({ ...defaultModel, ...defaultCamera, ...defaultText, ...defaultSearchlights }); return }
     const keys = RESET_KEYS[tab] ?? []
     if (keys.length) setGradientSettings({ ...getGradientSettings(), ...Object.fromEntries(keys.map(key => [key, defaultGradientSettings[key]])) } as GradientSettings)
     if (tab === "site") setCardSettings(defaultCardSettings)

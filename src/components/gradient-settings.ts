@@ -146,7 +146,7 @@ export const defaultGradientSettings = {
   dotsOpacity: 0.45,   // ink per dot (0–1)
   dotsColumns: 161,    // columns across one card (the video slots use 155 across ~917px: 5.9px cells; a 678px card at 115 columns is the same cell)
   dotsRatio: 2.07,     // cell height ÷ cell width: the glyph aspect of the effect (12.25 ÷ 5.918)
-  dotsSize: 1.5,       // px: the dot
+  dotsSize: 1.5,       // px: the dot, the one size for every dot grid on the site (cards, separators, strip, footer, searchlight)
   // Featured cards, hover: how the dots behind the title appear (random reveal, same family as the text reveal)
   stripOpacity: 0.5,  // ink per dot (0–1)
   stripSize: 1.3,      // px: the dot

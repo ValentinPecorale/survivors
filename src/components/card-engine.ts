@@ -1,5 +1,5 @@
 /**
- * Card motion engine. Each card owns a position `p` (0 = off-screen right,
+ * Card motion engine. Each card owns a position `p` (0 = off-screen below,
  * 1 = fully covering). Two things move it:
  *
  *  - tween: timed slide (nav button / close). Eased, fixed duration.
@@ -58,7 +58,7 @@ export function createCardEngine<Id extends string>(order: readonly Id[], onChan
     const el = els.get(key)
     const m = motion.get(key)
     if (!el || !m) return
-    el.style.transform = m.p >= 1 ? "none" : `translateX(${(1 - m.p) * 100}%)`
+    el.style.transform = m.p >= 1 ? "none" : `translateY(${(1 - m.p) * 100}%)`
   }
   const remove = (key: number) => {
     motion.delete(key)

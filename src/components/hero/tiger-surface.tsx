@@ -48,6 +48,38 @@ function useSurface(scene: THREE.Object3D, create: () => SurfaceMaterial, identi
   return materials
 }
 
+/** The .lab's studio rotation, undone (see ChromeSurface), and the scratch values the chrome look is built from. */
+const STUDIO_ALIGNMENT = new THREE.Quaternion().setFromEuler(new THREE.Euler(
+  THREE.MathUtils.degToRad(26.4), THREE.MathUtils.degToRad(-71.8), THREE.MathUtils.degToRad(37.4), "XYZ")).invert()
+const studioTurn = new THREE.Quaternion()
+const studioAxis = new THREE.Vector3(0, 1, 0)
+
+/** The tiger's chrome look, as one function: both the tiger and anything else that must match it (the targeted searchlight) use it. */
+function applyChrome(material: SurfaceMaterial, settings: ModelSettings, normalization: number) {
+  material.color.set(settings.tigerColor)
+  material.roughness = settings.tigerRoughness
+  material.metalness = settings.tigerMetalness
+  material.wireframe = settings.tigerWireframe
+  material.envMapIntensity = settings.tigerReflection * normalization
+  studioTurn.setFromAxisAngle(studioAxis, THREE.MathUtils.degToRad(settings.tigerStudioRotation)).premultiply(STUDIO_ALIGNMENT)
+  material.envMapRotation.setFromQuaternion(studioTurn)
+}
+
+/** One shared chrome material, identical to the tiger's and following the same panel settings. Suspends until the studio HDR is loaded. */
+export function useChromeMaterial(settings: ModelSettings) {
+  const texture = useLoader(HDRLoader, STUDIO_URL)
+  const normalization = useMemo(() => studioNormalization(texture), [texture])
+  const material = useMemo(() => {
+    texture.mapping = THREE.EquirectangularReflectionMapping
+    const created = new MeshPhysicalNodeMaterial()
+    created.envMap = texture
+    return created
+  }, [texture])
+  useLayoutEffect(() => { applyChrome(material, settings, normalization) }, [material, normalization, settings])
+  useLayoutEffect(() => () => material.dispose(), [material])
+  return material
+}
+
 function ChromeSurface({ scene, settings }: Props) {
   const texture = useLoader(HDRLoader, STUDIO_URL)
   const normalization = useMemo(() => studioNormalization(texture), [texture])

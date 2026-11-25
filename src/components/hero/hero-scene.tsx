@@ -18,8 +18,13 @@ import { useAsciiHover } from "./ascii-hover"
 import { Tiger } from "./tiger"
 import { getCardSettings, scrollCamera } from "../card-settings"
 import { skyLook, stepSky } from "./sky-look"
+import { lightTarget } from "./light-target"
+import { runState } from "./run-state"
+import { createShrinkDriver, prepareShrink, shrinkParams, shrinkPosition, updateDustFade, type ShrinkOrder } from "./plant-shrink"
+import { bezierEase } from "../card-settings"
 import { asciiConfig, columnsFor } from "./ascii-config"
 import { FloorText } from "./floor-text"
+import { Searchlights } from "./searchlights"
 
 const MODEL_URL = "/models/plants.glb?v=frontplants-20261111"
 useGLTF.preload(MODEL_URL)
@@ -30,6 +35,14 @@ const AUTHORED_ASPECT = 16 / 9
 /**
  * Plays the GLB exactly as framed in Blender, through the GLB's own camera.
  */
+/** Footsteps: a timed fade, 1.4s out when a searchlight is targeted and 0.8s back in on leaving, eased (smoothstep) so it tapers instead of dropping. */
+const AXIS_X = new THREE.Vector3(1, 0, 0), AXIS_Y = new THREE.Vector3(0, 1, 0), lookYaw = new THREE.Quaternion(), lookPitch = new THREE.Quaternion()
+const stepLevel = { t: 1 }
+function stepFade(targeted: boolean, dt: number) {
+  stepLevel.t = THREE.MathUtils.clamp(stepLevel.t + (targeted ? -dt / 1.4 : dt / 0.8), 0, 1)
+  return stepLevel.t * stepLevel.t * (3 - 2 * stepLevel.t)
+}
+
 function Plants({ settings, orbitTarget, subjectFrame }: { settings: ModelSettings; orbitTarget: THREE.Vector3; subjectFrame: TigerFrame }) {
   const { scene, animations, cameras } = useGLTF(MODEL_URL)
   const { actions, mixer } = useAnimations(animations, scene)
@@ -127,25 +140,40 @@ function Plants({ settings, orbitTarget, subjectFrame }: { settings: ModelSettin
     if (clip) { clip.time = settings.start; mixer.update(0) }
   }, [clip, mixer, settings.start])
 
+  const renderer = useThree(s => s.gl) as unknown as WebGPURenderer
+  const shrinkMeshes = useRef<THREE.Mesh[]>([])
+  const dustMeshes = useRef<THREE.Mesh[]>([])
+  const shrink = useMemo(() => createShrinkDriver(), [])
   useEffect(() => {
     const originals = new Map<THREE.Mesh, THREE.Material | THREE.Material[]>()
     const created: THREE.Material[] = []
+    const plants: THREE.Mesh[] = []
+    const dust: THREE.Mesh[] = []
     scene.traverse(object => {
       if (!(object instanceof THREE.Mesh)) return
       originals.set(object, object.material)
+      // Plants and trees are the big meshes; the 42-vertex dust quads are not plants and never shrink.
+      const plant = object.geometry.attributes.position.count > 1000
+      if (plant) { prepareShrink(object); plants.push(object) }
+      if ((Array.isArray(object.material) ? object.material[0] : object.material).name?.startsWith("Dust")) dust.push(object)
       const convert = (source: THREE.Material) => {
         const material = settings.material === "clay" ? new THREE.MeshStandardMaterial({ color: "#d5d5d0", roughness: 0.8 })
           : settings.material === "normal" ? new THREE.MeshNormalMaterial() : source.clone()
         if ("wireframe" in material) material.wireframe = settings.wireframe
         // Dust puffs sit at the tiger's paws; writing depth would clip the legs drawn afterwards.
         if (source.name === "Dust_Puff") material.depthWrite = false
-        created.push(material)
-        return material
+        // Plants get the top-down shrink as a TSL position node, which needs a node material (WebGPU would convert it silently otherwise).
+        const node = plant && source.name !== "Dust_Puff" ? renderer.library.fromMaterial(material) : null
+        if (node) { node.positionNode = shrinkPosition(); material.dispose() }
+        created.push(node ?? material)
+        return node ?? material
       }
       object.material = Array.isArray(object.material) ? object.material.map(convert) : convert(object.material)
     })
+    shrinkMeshes.current = plants
+    dustMeshes.current = dust
     return () => { originals.forEach((material, mesh) => { mesh.material = material }); created.forEach(material => material.dispose()) }
-  }, [scene, settings.material, settings.wireframe])
+  }, [scene, renderer, settings.material, settings.wireframe])
   useEffect(() => { if (settings.spin === 0) spin.current = 0 }, [settings.spin])
   // Plant hover rustle: one ray per animation frame at most, only while the pointer moves.
   const getState = useThree(s => s.get)
@@ -189,8 +217,21 @@ function Plants({ settings, orbitTarget, subjectFrame }: { settings: ModelSettin
     }
   }, [scene, canvas, getState, settings.hoverSound])
   useFrame((_, delta) => {
+    // Sky view, aimed at a searchlight: the plants and trees shrink away from the top down (see plant-shrink.ts), and grow back on leaving.
+    shrinkParams.softness.value = settings.shrinkSoftness
+    shrinkParams.overlap.value = settings.shrinkOverlap
+    shrink.update(shrinkMeshes.current, {
+      goal: settings.plantsShrink && lightTarget.active && skyLook.target > 0, dt: Math.min(delta, 0.1),
+      duration: settings.shrinkDuration, spread: settings.shrinkSpread, returnSpeed: settings.shrinkReturn,
+      ease: bezierEase([settings.shrinkEaseX1, settings.shrinkEaseY1, settings.shrinkEaseX2, settings.shrinkEaseY2]),
+      order: settings.shrinkOrder as ShrinkOrder, focus: lightTarget.point,
+    })
+    updateDustFade(dustMeshes.current, shrink.elapsed, settings.shrinkDustFade)
+    // Sky view: the forest (and the searchlights riding it) slows to a stop while the tiger keeps running.
+    if (clip) clip.timeScale = settings.speed * (1 - skyLook.progress)
+    runState.forestTime = clip?.time ?? 0
     // Recorded footsteps, phase-locked to the clip clock (see sound.ts). Ping-pong reverses time, so it stays silent there.
-    updateSteps({ enabled: settings.stepSound && settings.repeat !== "pingpong", playing: settings.playing, volume: settings.stepVolume, speed: settings.speed, clipTime: clip?.time ?? 0, offset: settings.stepOffset })
+    updateSteps({ enabled: settings.stepSound && settings.repeat !== "pingpong", playing: settings.playing, volume: settings.stepVolume * stepFade(lightTarget.active && skyLook.target > 0, Math.min(delta, 0.1)), speed: settings.speed, clipTime: clip?.time ?? 0, offset: settings.stepOffset })
     const state = cursor.current
     // Exponential damping reaches 95% of the target within the smoothing time.
     // Clamp delta so restoring a background tab cannot produce a large jump.
@@ -248,9 +289,34 @@ function Plants({ settings, orbitTarget, subjectFrame }: { settings: ModelSettin
       if (fit <= 1 || attempt === 2) break
       cameraOrbit.sphere.radius *= fit * 1.015
     }
+    // Sky view: the camera lets go of the tiger and travels with a searchlight (see light-target.ts). It is only translated, so the
+    // side-on orientation and the radius settled above are kept; the light ends up centred and the tiger, still running in place, slides out of frame.
+    lightTarget.reference.copy(orbitTarget)
+    const sky = stepSky(delta, state.reduced)
+    const tracking = lightTarget.active ? sky * sky * (3 - 2 * sky) : 0
+    // Scrolling brings the camera to the light. The second move, on to the projection, is timed (lightTarget.look), not scrubbed.
+    const lookUp = lightTarget.look
+    if (tracking > 0) {
+      camera.position.addScaledVector(cameraOrbit.sample.copy(lightTarget.point).sub(orbitTarget).setY(0), tracking)
+      camera.updateMatrixWorld(true)
+    }
+    // Zoom in on the device as the view arrives. Done here, after the fit loop above: that loop pulls the camera back to fit the tiger's
+    // envelope, and a zoomed lens would make it do so for good.
+    if (tracking > 0 && settings.searchlightZoom !== 1) {
+      const zoom = 1 + (settings.searchlightZoom - 1) * tracking
+      camera.fov = THREE.MathUtils.radToDeg(2 * Math.atan(Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2) / zoom))
+      camera.updateProjectionMatrix()
+    }
     if (screenBounds) {
-      const centerX = (screenBounds.minX + screenBounds.maxX) / 2
-      const centerY = (screenBounds.minY + screenBounds.maxY) / 2
+      // The lens shift centres the tiger's envelope, and moves over to the searchlight device as the sky view comes in.
+      let centerX = (screenBounds.minX + screenBounds.maxX) / 2
+      let centerY = (screenBounds.minY + screenBounds.maxY) / 2
+      if (tracking > 0) {
+        // The camera only slid sideways; the device is brought to the middle with the lens shift, so the camera never rises or falls.
+        const device = cameraOrbit.sample.copy(lightTarget.point).project(camera)
+        centerX += (device.x - centerX) * tracking
+        centerY += (device.y - centerY) * tracking
+      }
       // Lens shift centers the fixed framing envelope without chasing animation.
       // Explicit user framing shifts remain deliberate offsets from center.
       camera.setViewOffset(size.width, size.height,
@@ -268,9 +334,22 @@ function Plants({ settings, orbitTarget, subjectFrame }: { settings: ModelSettin
       camera.position.y += heightOffset * settings.landingStrength * (1 - blend01)
       camera.updateMatrixWorld(true)
     }
-    // Sky view: tilt up after everything else has placed the camera (see sky-look.ts).
-    const sky = stepSky(delta, state.reduced)
-    if (sky > 0) {
+    // Phase two: the camera move from the original Blender camera, run on top of the framing: while k goes 0 to 1 the camera turns 135 degrees
+    // about the vertical axis and tips up 19.71 degrees (rotation YXZ: Y 90 - 135k, X 19.71k), eased with smoothstep. The end pose is
+    // published (skyDir, skyQuat) so the projection is hung exactly where that view ends up looking.
+    if (tracking > 0) {
+      const yaw = (k: number) => lookYaw.setFromAxisAngle(AXIS_Y, THREE.MathUtils.degToRad(settings.lookYaw * k))
+      const pitch = (k: number) => lookPitch.setFromAxisAngle(AXIS_X, THREE.MathUtils.degToRad(settings.lookPitch * k))
+      lightTarget.skyQuat.copy(yaw(1)).multiply(camera.quaternion).multiply(pitch(1))
+      lightTarget.skyDir.set(0, 0, -1).applyQuaternion(lightTarget.skyQuat)
+      if (lookUp > 0) {
+        const eased = lookUp * lookUp * (3 - 2 * lookUp)
+        camera.quaternion.premultiply(yaw(eased)).multiply(pitch(eased))
+        camera.updateMatrixWorld(true)
+      }
+    }
+    // Fallback while no searchlight is available: tilt up after everything else has placed the camera (see sky-look.ts).
+    if (sky > 0 && tracking === 0) {
       camera.rotateX(THREE.MathUtils.degToRad(skyLook.pitchDeg) * sky)
       camera.updateMatrixWorld(true)
     }
@@ -280,6 +359,7 @@ function Plants({ settings, orbitTarget, subjectFrame }: { settings: ModelSettin
   return <group ref={root} position={[settings.positionX, settings.positionY, settings.positionZ]}
     rotation={[THREE.MathUtils.degToRad(settings.rotationX), THREE.MathUtils.degToRad(settings.rotationY), THREE.MathUtils.degToRad(settings.rotationZ)]} scale={settings.scale}>
     <primitive object={scene} />
+    <Searchlights clipTime={() => clip?.time ?? 0} settings={settings} />
     <FloorText settings={settings} />
   </group>
 }
